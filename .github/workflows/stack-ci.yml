@@ -24,7 +24,7 @@ jobs:
       - name: Enumerate stack.yaml Files
         id: enumerate
         run: |
-          ls stack*.yaml | jq -R -s -c 'split("\n")[:-1]' > stack-yamls.json
+          find . -type f -iname 'stack*.yaml' | jq -R -s -c 'split("\n")[:-1]' > stack-yamls.json
           cat stack-yamls.json
           echo "::set-output name=stack-yamls::$(cat stack-yamls.json)"
 
