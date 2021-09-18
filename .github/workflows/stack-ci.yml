@@ -27,13 +27,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@5a4ac9002d0be2fb38bd78e4b4dbde5606d7042f
 
-      - name: Debug
-        run: |
-          echo event "${{ toJson(github.event) }}"
-          echo base_ref "${{ github.base_ref }}"
-          echo head_ref "${{ github.head_ref }}"
-          echo ref "${{ github.ref }}"
-
       - name: Enumerate stack.yaml Files
         id: enumerate
         run: |
