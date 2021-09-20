@@ -64,7 +64,7 @@ jobs:
 
       ghc-cache-ver: v1
       dep-cache-ver: v1
-      mod-cache-ver: v1
+      mod-cache-ver: v2
 
     steps:
       - name: Checkout
@@ -186,12 +186,44 @@ jobs:
       # time, so leave that out -- rebuilding unconditionally seems worse than
       # building (and caching) dependencies' haddock.
       - name: Build
-        run: $STACK build --test --no-run-tests
+        id: stack-build
+        continue-on-error: true
+        run: |
+          $STACK build --test --no-run-tests
+          echo "::set-output name=result::$?"
 
       # Run tests with concurrency disabled; see
       # https://github.com/commercialhaskell/stack/issues/5024.
       - name: Test
-        run: $STACK build --test -j 1
+        id: stack-test
+        if: ${{ steps.stack-build.outputs.result == 0 }}
+        continue-on-error: true
+        run: |
+          $STACK build --test -j 1
+          echo "::set-output name=result::$?"
 
       - name: Haddock
-        run: $STACK build --haddock --test --no-run-tests
+        id: stack-haddock
+        if: ${{ steps.stack-build.outputs.result == 0 }}
+        continue-on-error: true
+        run: |
+          $STACK build --haddock --test --no-run-tests
+          echo "::set-output name=result::$?"
+
+      - name: Summarize Results
+        run: |
+          RESULT_FILE=results-${{ matrix.build.resolver}}-${{ matrix.build.compiler }}.json
+          jq --null-input \
+            --argjson build "${{ toJson(steps.stack-build.outputs.result) }}" \
+            --argjson test "${{ toJson(steps.stack-test.outputs.result) }}" \
+            --argjson haddock "${{ toJson(steps.stack-haddock.outputs.result) }}" \
+            '{ "build": $build, "test": $test, "haddock": $haddock }' \
+            > $RESULT_FILE
+          cat $RESULT_FILE
+
+      - name: Final Outcome
+        run: |
+          set -e
+          if [[ "${{ steps.stack-build.outputs.result }}" -ne 0 ]]; then false; fi
+          if [[ "${{ steps.stack-test.outputs.result }}" -ne 0 ]]; then false; fi
+          if [[ "${{ steps.stack-haddock.outputs.result }}" -ne 0 ]]; then false; fi
