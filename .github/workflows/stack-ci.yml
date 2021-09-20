@@ -212,14 +212,19 @@ jobs:
 
       - name: Summarize Results
         run: |
-          RESULT_FILE=results-${{ matrix.build.resolver}}-${{ matrix.build.compiler }}.json
           jq --null-input \
             --argjson build "${{ toJson(steps.stack-build.outputs.result) }}" \
             --argjson test "${{ toJson(steps.stack-test.outputs.result) }}" \
             --argjson haddock "${{ toJson(steps.stack-haddock.outputs.result) }}" \
             '{ "build": $build, "test": $test, "haddock": $haddock }' \
-            > $RESULT_FILE
-          cat $RESULT_FILE
+            > results.json
+          cat results.json
+
+      - name: Upload Results
+        uses: actions/upload-artifact@v2
+        with:
+          name: "results-${{ matrix.build.resolver}}-${{ matrix.build.compiler }}.json"
+          path: results.json
 
       - name: Final Outcome
         run: |
@@ -227,3 +232,15 @@ jobs:
           if [[ "${{ steps.stack-build.outputs.result }}" -ne 0 ]]; then false; fi
           if [[ "${{ steps.stack-test.outputs.result }}" -ne 0 ]]; then false; fi
           if [[ "${{ steps.stack-haddock.outputs.result }}" -ne 0 ]]; then false; fi
+  upload:
+    name: Gather Results
+    runs-on: ubuntu-latest
+    needs: [ prepare, build ]
+    steps:
+      - run: echo "${{ needs.prepare.outputs.ci-builds }}"
+
+      - uses: actions/download-artifact@v2
+        with:
+          path: results
+
+      - run: find results -exec cat {} \;
