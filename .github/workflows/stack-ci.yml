@@ -199,7 +199,7 @@ jobs:
         if: ${{ steps.stack-build.outputs.result == 0 }}
         continue-on-error: true
         run: |
-          $STACK build --test -j 1
+          $STACK build --haddock --test -j 1
           echo "::set-output name=result::$?"
 
       - name: Haddock
