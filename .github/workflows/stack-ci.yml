@@ -189,7 +189,7 @@ jobs:
         id: stack-build
         continue-on-error: true
         run: |
-          $STACK build --test --no-run-tests
+          $STACK build --haddock --test --no-run-tests
           echo "::set-output name=result::$?"
 
       # Run tests with concurrency disabled; see
