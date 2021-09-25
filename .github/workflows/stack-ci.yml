@@ -192,10 +192,8 @@ jobs:
       # building (and caching) dependencies' haddock.
       - name: Build
         run: |
-          echo "::add-matcher::stack-ghc.json"
           $STACK build --no-interleaved-output --test --no-run-tests 2>&1 | \
-            sed -r -f .github/matchers/ghc.sed
-          echo "::remove-matcher owner=stack-ghc::"
+            awk -f .github/matchers/ghc.awk
 
       # Run tests with concurrency disabled; see
       # https://github.com/commercialhaskell/stack/issues/5024.
