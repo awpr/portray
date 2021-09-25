@@ -19,6 +19,9 @@ BEGIN {
     line = $2
     col = $3
     sev = substr($4, 1)
+    if ($5 ~ "-Werror") {
+      sev = "warning"
+    }
   } else {
     print $0
   }

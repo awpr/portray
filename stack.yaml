@@ -29,4 +29,4 @@ extra-deps:
 - sint-0.1.0.0
 
 ghc-options:
-  "$locals": -Wall
+  "$locals": -Wall -Werror
