@@ -166,10 +166,14 @@ main = defaultMain
       , testCase "line-break" $
           basicShowPortrayal
               (Tuple [strAtom "222", strAtom (replicate 80 '2')]) @?=
+#ifdef __HLINT__
+            ""
+#else
             "( 222\n\\
             \, 2222222222222222222222222222222222222222222222222222222222222\\
             \2222222222222222222\n\\
             \)"
+#endif
       ]
 
   , testGroup "List"
@@ -194,10 +198,14 @@ main = defaultMain
                 [ (Name "True", strAtom (replicate 40 '2'))
                 , (Name "False", strAtom (replicate 40 '4'))
                 ]) @?=
+#ifdef __HLINT__
+            ""
+#else
             "\\case\n\\
             \  { True -> 2222222222222222222222222222222222222222\n\\
             \  ; False -> 4444444444444444444444444444444444444444\n\\
             \  }"
+#endif
       , testCase "no-parens" $
           basicShowPortrayal
               (LambdaCase
@@ -229,10 +237,14 @@ main = defaultMain
                 [ FactorPortrayal "l" (portray @[Int] [0..10])
                 , FactorPortrayal "r" (portray @[Int] [0..10])
                 ]) @?=
+#ifdef __HLINT__
+            ""
+#else
           "These\n\\
           \  { l = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]\n\\
           \  , r = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]\n\\
           \  }"
+#endif
       , testCase "break-equals" $
           basicShowPortrayal
               (Record (Name "These")
@@ -240,10 +252,14 @@ main = defaultMain
                     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                     (Name "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
                 ]) @?=
+#ifdef __HLINT__
+            ""
+#else
             "These\n\\
             \  { aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa =\n\\
             \      aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\\
             \  }"
+#endif
       ]
 
   , testGroup "TyApp"
@@ -259,8 +275,12 @@ main = defaultMain
               (TyApp
                 (strAtom $ replicate 50 'a')
                 (strAtom $ replicate 50 'a')) @?=
+#ifdef __HLINT__
+            ""
+#else
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\\
             \  @aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+#endif
       ]
 
   , testGroup "TySig"
@@ -277,8 +297,12 @@ main = defaultMain
               (TySig
                 (strAtom $ replicate 50 'a')
                 (strAtom $ replicate 50 'a')) @?=
+#ifdef __HLINT__
+            ""
+#else
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\\
             \  :: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+#endif
       , testCase "parens" $
           basicShowPortrayal
               (Apply (Name "Just") [TySig (LitInt 2) (Name "Int")]) @?=
