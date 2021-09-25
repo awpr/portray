@@ -70,11 +70,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@5a4ac9002d0be2fb38bd78e4b4dbde5606d7042f
 
-      - name: Convert Matchers
-        run: |
-          yq eval -o json .github/matchers/stack-ghc.yaml > stack-ghc.json
-          cat stack-ghc.json
-
       # Install Stack without GHC first, so we have an opportunity to cache the
       # Pantry package index.
       - name: Install Stack
@@ -192,6 +187,7 @@ jobs:
       # building (and caching) dependencies' haddock.
       - name: Build
         run: |
+          set -o pipefail
           $STACK build --no-interleaved-output --test --no-run-tests 2>&1 | \
             awk -f .github/matchers/ghc.awk
 
