@@ -1,11 +1,9 @@
 problemMatcher:
   - owner: stack-ghc
     pattern:
-    - regexp: '^([^:]+):(\d+):(\d+):\s+(error|warning):.*$'
-      file: 1
-      line: 2
-      column: 3
-      severity: 4
-    - regexp: '(.+)'
-      message: 1
-      loop: true
+      - regexp: '^([^:]+):(\d+):(\d+):\s+(error|warning):.*((?:\n.+)*)'
+        file: 1
+        line: 2
+        column: 3
+        severity: 4
+        message: 5
