@@ -7,7 +7,7 @@ BEGIN {
 {
   if (in_error) {
     if ($0 == "") {
-      printf("::%s file=%s,line=%s,col=%s::%s\n", sev, file, line, col, msg)
+      printf("::%s file=%s,line=%s,col=%s,code=%s::%s\n", sev, file, line, col, code, msg)
       in_error = 0
     } else {
       msg = msg $0 "%0A"
@@ -22,12 +22,17 @@ BEGIN {
     if ($5 ~ "-Werror") {
       sev = "warning"
     }
+    if (match($5, "-W([^,]*),", groups)) {
+      code = groups[1]
+    } else {
+      code = ""
+    }
   } else {
     print $0
   }
 }
 END {
   if (in_error) {
-    printf("::%s file=%s,line=%s,col=%s::%s\n", sev, file, line, col, msg)
+    printf("::%s file=%s,line=%s,col=%s,code=%s::%s\n", sev, file, line, col, code, msg)
   }
 }
