@@ -18,7 +18,7 @@ BEGIN {
     file = $1
     line = $2
     col = $3
-    sev = $4
+    sev = substr($4, 1)
   } else {
     print $0
   }
