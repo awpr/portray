@@ -27,6 +27,3 @@ extra-deps:
 - wrapped-0.1.0.0
 - fin-int-0.1.0.0
 - sint-0.1.0.0
-
-ghc-options:
-  "$locals": -Wall -Werror

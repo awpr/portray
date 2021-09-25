@@ -62,6 +62,8 @@ jobs:
     env:
       STACK: "stack --lock-file read-write --resolver ${{ matrix.build.resolver }} --compiler ${{ matrix.build.compiler }}"
 
+      BUILD: "build --no-interleaved-output --ghc-options=-fno-diagnostics-show-caret"
+
       ghc-cache-ver: v1
       dep-cache-ver: v1
       mod-cache-ver: v1
@@ -124,7 +126,7 @@ jobs:
       # Have stack construct a build plan and lock file for use as a cache key.
       - name: Determine Build Plan
         run: |
-          $STACK build --test --dry-run
+          $STACK $BUILD --test --dry-run
           echo '\n' stack.yaml.lock ${{ hashFiles('stack.yaml.lock') }}
 
       # Cache pre-built dependencies from the same lock file; restore from
@@ -162,7 +164,7 @@ jobs:
 
       # Build the dependencies, hopefully doing little to no work.
       - name: Build Dependencies
-        run: $STACK build --test --only-dependencies
+        run: $STACK $BUILD --test --only-dependencies
 
       # Cache pre-built modules for incremental builds, making sure to keep
       # builds with different dependencies separate.
@@ -188,13 +190,13 @@ jobs:
       - name: Build
         run: |
           set -o pipefail
-          $STACK build --no-interleaved-output --test --no-run-tests 2>&1 | \
+          $STACK $BUILD --test --no-run-tests 2>&1 | \
             awk -f .github/matchers/ghc.awk
 
       # Run tests with concurrency disabled; see
       # https://github.com/commercialhaskell/stack/issues/5024.
       - name: Test
-        run: $STACK build --test -j 1
+        run: $STACK $BUILD --test -j 1
 
       - name: Haddock
-        run: $STACK build --haddock --test --no-run-tests
+        run: $STACK $BUILD --haddock --test --no-run-tests

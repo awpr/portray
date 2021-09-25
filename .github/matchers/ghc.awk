@@ -7,7 +7,7 @@ BEGIN {
 {
   if (in_error) {
     if ($0 == "") {
-      printf("::error file=%s,line=%s,col=%s::%s\n", file, line, col, msg)
+      printf("::%s file=%s,line=%s,col=%s::%s\n", sev, file, line, col, msg)
       in_error = 0
     } else {
       msg = msg $0 "%0A"
@@ -18,12 +18,13 @@ BEGIN {
     file = $1
     line = $2
     col = $3
+    sev = $4
   } else {
     print $0
   }
 }
 END {
   if (in_error) {
-    printf("::error file=%s,line=%s,col=%s::%s\n", file, line, col, msg)
+    printf("::%s file=%s,line=%s,col=%s::%s\n", sev, file, line, col, msg)
   }
 }
