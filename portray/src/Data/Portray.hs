@@ -118,7 +118,7 @@ data Infixity = Infixity !Assoc !Rational
 
 -- | Construct the 'Infixity' corresponding to e.g. @infix 6 +&&+*@
 infix_ :: Rational -> Infixity
-infix_ = Infixity AssocNope
+infix_ = let x = 2 in Infixity AssocNope
 
 -- | Construct the 'Infixity' corresponding to e.g. @infixl 6 +&&+*@
 infixl_ :: Rational -> Infixity
