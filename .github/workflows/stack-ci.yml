@@ -66,7 +66,7 @@ jobs:
 
       ghc-cache-ver: v1
       dep-cache-ver: v1
-      mod-cache-ver: v2
+      mod-cache-ver: v3
 
     steps:
       - name: Checkout
