@@ -110,6 +110,7 @@ module Data.Portray.Prettyprinter
          , styleShowPortrayal, prettyShowPortrayal, basicShowPortrayal
          ) where
 
+import Data.Bifunctor (bimap)
 import Data.Char (isAscii, isDigit, isPrint)
 import Data.Function ((&))
 import Data.Functor ((<&>))
@@ -260,7 +261,7 @@ escapeSpecialOnly = const False
 --   defaultConfig
 --     & setShouldEscapeChar (const True) -- Escape everything we can.
 -- @
-data Config = Config
+newtype Config = Config
   { _shouldEscapeChar :: Char -> Bool
   }
 
@@ -342,7 +343,7 @@ ppBulletList o s c = \case
         id
         mempty
         (opener <> P.flatAlt " " "" <> doc :
-          zipWith (P.<+>) (repeat separator) docs) <>
+          map (separator P.<+>) docs) <>
       P.line' <> closer
  where
   opener = P.annotate Bracket o
@@ -452,9 +453,7 @@ ppStrLit cfg unescaped =
 
   escapedLinesOfWords :: [[(Doc SyntaxClass, Doc SyntaxClass)]]
   escapedLinesOfWords =
-    map
-        (\ (w, ws) -> (ppWord w, ppWhitespace ws)) .
-      wordsSep <$>
+    map (bimap ppWord ppWhitespace) . wordsSep <$>
     linesSep unescaped
 
   ppWhitespace :: Text -> Doc SyntaxClass
@@ -509,7 +508,7 @@ toDocAssocPrecF cfg = \case
       P.nest 2 $ P.sep
         [ P.annotate Structural "\\" <> P.annotate Keyword "case"
         , ppBulletList "{" ";" "}"
-            [ P.nest 2 $ P.sep $
+            [ P.nest 2 $ P.sep
                 [ pat AssocNope 0 P.<+> P.annotate Structural "->"
                 , val AssocNope 0
                 ]

@@ -96,7 +96,7 @@ instance (Generic a, GDiff a (Rep a)) => Diff (Wrapped Generic a) where
   diff (Wrapped x) (Wrapped y) = gdiff x y (from x) (from y)
 
 vs, diffVs :: Portrayal -> Portrayal -> Portrayal
-vs a b = Binop (Ident OpIdent "/=") (Infixity AssocNope 4) a b
+vs = Binop (Ident OpIdent "/=") (Infixity AssocNope 4)
 diffVs = vs
 
 -- | Diff on an atomic type, just by using the Eq and Portray instances without

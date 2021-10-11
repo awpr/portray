@@ -23,7 +23,6 @@ module Main where
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Text (Text)
 import qualified Data.Text as T (pack)
-import Data.Void (Void)
 import GHC.Generics (Generic)
 import Type.Reflection (typeRep)
 
@@ -83,8 +82,6 @@ main = defaultMain
       ]
 
   , testCase "portray String" $ portray ("aoeu" :: String) @?= LitStr "aoeu"
-
-  , testCase "portray Void" $ const () (\x -> portray @Void x) @?= ()
 
   , testGroup "tuples"
       [ testCase "portray (,)" $

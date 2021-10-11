@@ -13,8 +13,6 @@
 -- limitations under the License.
 
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -24,7 +22,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -32,7 +29,6 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE ViewPatterns #-}
 
 -- | Provides a typeclass for rendering values to pseudo-Haskell syntax.
 
@@ -313,7 +309,7 @@ instance Portray a => Portray [a] where
 deriving via Wrapped Generic (Proxy a) instance Portray (Proxy a)
 
 instance Portray TyCon where
-  portray tc = portrayTyCon tc
+  portray = portrayTyCon
 
 instance Portray (TypeRep a) where
   portray = TyApp (Name $ Ident VarIdent "typeRep") . portrayType

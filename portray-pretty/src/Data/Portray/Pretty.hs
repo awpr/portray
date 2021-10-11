@@ -184,7 +184,7 @@ ppBulletList
   -> Doc
 ppBulletList opener _         closer []   = opener <> closer
 ppBulletList opener separator closer docs =
-  P.sep $
+  P.sep
     [ P.fcat $ zipWith (P.<+>) (opener : repeat separator) docs
     , closer
     ]
@@ -213,7 +213,7 @@ toDocAssocPrecF = \case
       P.sep
         [ "\\case"
         , P.nest 2 $ ppBulletList "{" ";" "}"
-            [ P.sep $
+            [ P.sep
                 [ pat AssocNope 0 P.<+> "->"
                 , P.nest 2 $ val AssocNope 0
                 ]
