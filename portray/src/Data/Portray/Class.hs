@@ -12,6 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE EmptyCase #-}
@@ -41,15 +42,24 @@ module Data.Portray.Class
          , PortrayIntLit(..), PortrayRatLit(..), ShowAtom(..)
          ) where
 
-import Data.Char (isAlpha)
+import Control.Applicative (ZipList)
+import Data.Char (GeneralCategory, isAlpha)
+import Data.Complex (Complex)
+import Data.Fixed (Fixed, HasResolution)
 import Data.Functor.Identity (Identity(..))
+import Data.Functor.Compose (Compose(..))
 import Data.Functor.Const (Const(..))
+import qualified Data.Functor.Sum as F (Sum(..))
+import qualified Data.Functor.Product as F (Product(..))
 import Data.Int (Int8, Int16, Int32, Int64)
 import Data.IntMap (IntMap)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Map (Map)
+import Data.Monoid (All, Any, Product, Sum, Dual, Last, First, Ap, Alt)
 import Data.Proxy (Proxy)
 import Data.Ratio (Ratio, numerator, denominator)
+import Data.Semigroup (Option, WrappedMonoid, Max, Min, Arg)
+import qualified Data.Semigroup as SG
 import Data.Sequence (Seq)
 import Data.Set (Set)
 import Data.Text (Text)
@@ -58,8 +68,14 @@ import Data.Type.Equality ((:~:)(..))
 import Data.Void (Void)
 import Data.Word (Word8, Word16, Word32, Word64)
 import qualified Data.Text as T
-import GHC.Exts (IsList, proxy#)
+import GHC.Arr (Array)
+import qualified GHC.Arr as Arr
+import GHC.Exts
+         ( IsList, RuntimeRep(..), VecCount(..), VecElem(..)
+         , fromString, proxy#
+         )
 import qualified GHC.Exts as Exts
+import GHC.Fingerprint (Fingerprint(..))
 import GHC.Generics
          ( (:*:)(..), (:+:)(..)
          , Generic(..), Rep
@@ -70,9 +86,14 @@ import GHC.Generics
          , Fixity(..), Associativity(..)
          )
 import GHC.Stack (CallStack, getCallStack)
-import GHC.TypeLits (KnownSymbol, symbolVal')
+import GHC.TypeLits (KnownSymbol, SomeSymbol(..), symbolVal, symbolVal')
+import GHC.TypeNats (SomeNat(..), natVal)
 import Numeric.Natural (Natural)
-import Type.Reflection (TyCon, TypeRep, SomeTypeRep(..))
+import System.IO (IOMode)
+import Type.Reflection
+         ( TyCon, TypeRep, Module, SomeTypeRep(..)
+         , modulePackage, moduleName
+         )
 
 import Data.Wrapped (Wrapped(..))
 
@@ -239,6 +260,8 @@ instance Real a => Portray (PortrayRatLit a) where
 
 deriving via PortrayRatLit Float     instance Portray Float
 deriving via PortrayRatLit Double    instance Portray Double
+deriving via PortrayRatLit (Fixed a)
+  instance HasResolution a => Portray (Fixed a)
 
 -- | A newtype wrapper providing a 'Portray' instance via 'showAtom'.
 --
@@ -248,8 +271,14 @@ deriving via PortrayRatLit Double    instance Portray Double
 -- more detailed instances instead.
 newtype ShowAtom a = ShowAtom { unShowAtom :: a }
 
+-- | 'Portray' via 'show' followed by detecting the kind of 'Name' it returned.
 instance Show a => Portray (ShowAtom a) where
   portray = showAtom . unShowAtom
+
+newtype ShowName a = ShowName { unShowName :: a }
+
+instance Show a => Portray (ShowName a) where
+  portray = Name . fromString . show . unShowName
 
 instance Portray Char where
   portray = LitChar
@@ -280,6 +309,61 @@ deriving newtype
   instance (forall a. Portray a => Portray (f a)) => Portray (Fix f)
 deriving newtype instance Portray Portrayal
 
+deriving via Wrapped Generic Void instance Portray Void
+deriving via Wrapped Generic Bool instance Portray Bool
+deriving via Wrapped Generic Any instance Portray Any
+deriving via Wrapped Generic All instance Portray All
+deriving via Wrapped Generic Ordering instance Portray Ordering
+deriving via Wrapped Generic (Sum a) instance Portray a => Portray (Sum a)
+deriving via Wrapped Generic (Product a)
+  instance Portray a => Portray (Product a)
+deriving via Wrapped Generic (Dual a) instance Portray a => Portray (Dual a)
+deriving via Wrapped Generic (Last a) instance Portray a => Portray (Last a)
+deriving via Wrapped Generic (First a) instance Portray a => Portray (First a)
+deriving via Wrapped Generic (ZipList a)
+  instance Portray a => Portray (ZipList a)
+deriving via Wrapped Generic (Option a)
+  instance Portray a => Portray (Option a)
+deriving via Wrapped Generic (WrappedMonoid a)
+  instance Portray a => Portray (WrappedMonoid a)
+deriving via Wrapped Generic (SG.Last a)
+  instance Portray a => Portray (SG.Last a)
+deriving via Wrapped Generic (SG.First a)
+  instance Portray a => Portray (SG.First a)
+deriving via Wrapped Generic (Max a) instance Portray a => Portray (Max a)
+deriving via Wrapped Generic (Min a) instance Portray a => Portray (Min a)
+deriving via Wrapped Generic (Arg a b)
+  instance (Portray a, Portray b) => Portray (Arg a b)
+deriving via Wrapped Generic (Complex a)
+  instance Portray a => Portray (Complex a)
+deriving via Wrapped Generic (Proxy a) instance Portray (Proxy a)
+deriving via Wrapped Generic (Ap f a)
+  instance Portray (f a) => Portray (Ap f a)
+deriving via Wrapped Generic (Alt f a)
+  instance Portray (f a) => Portray (Alt f a)
+
+#if MIN_VERSION_base(4, 15, 0)
+deriving via Wrapped Generic GeneralCategory instance Portray GeneralCategory
+deriving via Wrapped Generic Fingerprint instance Portray Fingerprint
+#else
+instance Portray GeneralCategory where
+  portray = Name . fromString . show
+
+instance Portray Fingerprint where
+  portray (Fingerprint x y) = Apply (Name "Fingerprint") [portray x, portray y]
+#endif
+
+instance Portray RuntimeRep where
+  portray = \case
+    VecRep c e -> Apply (Name "VecRep") [portray c, portray e]
+    TupleRep reps -> Apply (Name "TupleRep") [portray reps]
+    SumRep reps -> Apply (Name "SumRep") [portray reps]
+    rep -> Name $ fromString $ show rep
+
+deriving via ShowName VecCount instance Portray VecCount
+deriving via ShowName VecElem instance Portray VecElem
+deriving via ShowName IOMode instance Portray IOMode
+
 deriving via Wrapped Generic (a, b)
   instance (Portray a, Portray b) => Portray (a, b)
 deriving via Wrapped Generic (a, b, c)
@@ -289,12 +373,24 @@ deriving via Wrapped Generic (a, b, c, d)
 deriving via Wrapped Generic (a, b, c, d, e)
   instance (Portray a, Portray b, Portray c, Portray d, Portray e)
         => Portray (a, b, c, d, e)
+deriving via Wrapped Generic (a, b, c, d, e, f)
+  instance (Portray a, Portray b, Portray c, Portray d, Portray e, Portray f)
+        => Portray (a, b, c, d, e, f)
+deriving via Wrapped Generic (a, b, c, d, e, f, g)
+  instance ( Portray a, Portray b, Portray c, Portray d, Portray e, Portray f
+           , Portray g
+           )
+        => Portray (a, b, c, d, e, f, g)
 deriving via Wrapped Generic (Maybe a)
   instance Portray a => Portray (Maybe a)
 deriving via Wrapped Generic (Either a b)
   instance (Portray a, Portray b) => Portray (Either a b)
-deriving via Wrapped Generic Void instance Portray Void
-deriving via Wrapped Generic Bool instance Portray Bool
+deriving via Wrapped Generic (F.Sum f g a)
+  instance (Portray (f a), Portray (g a)) => Portray (F.Sum f g a)
+deriving via Wrapped Generic (F.Product f g a)
+  instance (Portray (f a), Portray (g a)) => Portray (F.Product f g a)
+deriving via Wrapped Generic (Compose f g a)
+  instance (Portray (f (g a))) => Portray (Compose f g a)
 
 -- Aesthetic choice: I'd rather pretend Identity and Const are not records, so
 -- don't derive them via Generic.
@@ -306,13 +402,16 @@ instance Portray a => Portray (Const a b) where
 instance Portray a => Portray [a] where
   portray = portrayList
 
-deriving via Wrapped Generic (Proxy a) instance Portray (Proxy a)
-
 instance Portray TyCon where
   -- typeRepTyCon @TheTyCon typeRep
   portray con = Apply
     (TyApp (Name "typeRepTyCon") (portrayTyCon con))
     [Name "typeRep"]
+
+instance Portray Module where
+  portray m = Apply
+    (Name "Module")
+    [portray (modulePackage m), portray (moduleName m)]
 
 instance Portray (TypeRep a) where
   portray = TyApp (Name $ Ident VarIdent "typeRep") . portrayType
@@ -322,9 +421,23 @@ instance Portray SomeTypeRep where
     (TyApp (Name $ Ident ConIdent "SomeTypeRep") (portrayType ty))
     [Name $ Ident VarIdent "typeRep"]
 
+instance Portray SomeNat where
+  portray (SomeNat p) = Apply
+    (TyApp (Name "SomeNat") (portray (natVal p)))
+    [Name "Proxy"]
+
+instance Portray SomeSymbol where
+  portray (SomeSymbol p) = Apply
+    (TyApp (Name "SomeSymbol") (portray (symbolVal p)))
+    [Name "Proxy"]
+
 instance Portray (a :~: b) where portray Refl = Name $ Ident ConIdent "Refl"
 instance Portray (Coercion a b) where
   portray Coercion = Name $ Ident ConIdent "Coercion"
+
+instance (Arr.Ix i, Portray i, Portray a) => Portray (Array i a) where
+  portray x =
+    Apply (Name "array") [portray (Arr.bounds x), portray (Arr.assocs x)]
 
 -- | Portray a list-like type as "fromList [...]".
 instance (IsList a, Portray (Exts.Item a)) => Portray (Wrapped IsList a) where

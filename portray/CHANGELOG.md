@@ -2,6 +2,7 @@
 
 * Split into `Data.Portray.Portrayal` and `Data.Portray.Class` modules.
 * Keep a backwards-compatible (and convenient) `Data.Portray` reexport module.
+* Add a lot of instances for `base` types.
 
 # 0.2.0
 
