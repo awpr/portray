@@ -1,3 +1,8 @@
+# 0.2.1
+
+* Split into `Data.Portray.Portrayal` and `Data.Portray.Class` modules.
+* Keep a backwards-compatible (and convenient) `Data.Portray` reexport module.
+
 # 0.2.0
 
 * Split Atom into literals, identifiers, and opaque text.

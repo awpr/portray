@@ -41,6 +41,8 @@ source-repository head
 library
   exposed-modules:
       Data.Portray
+      Data.Portray.Portrayal
+      Data.Portray.Class
   hs-source-dirs:
       src
   build-depends:

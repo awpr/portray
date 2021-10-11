@@ -51,6 +51,8 @@ library:
   source-dirs: src
   exposed-modules:
     - Data.Portray
+    - Data.Portray.Portrayal
+    - Data.Portray.Class
 
   when:
     condition: false
