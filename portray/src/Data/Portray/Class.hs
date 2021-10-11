@@ -309,7 +309,10 @@ instance Portray a => Portray [a] where
 deriving via Wrapped Generic (Proxy a) instance Portray (Proxy a)
 
 instance Portray TyCon where
-  portray = portrayTyCon
+  -- typeRepTyCon @TheTyCon typeRep
+  portray con = Apply
+    (TyApp (Name "typeRepTyCon") (portrayTyCon con))
+    [Name "typeRep"]
 
 instance Portray (TypeRep a) where
   portray = TyApp (Name $ Ident VarIdent "typeRep") . portrayType
