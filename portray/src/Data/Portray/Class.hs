@@ -48,6 +48,9 @@ module Data.Portray.Class
          ) where
 
 import Control.Applicative (ZipList)
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy as BL
 import Data.Char (GeneralCategory, isAlpha)
 import Data.Complex (Complex)
 import Data.Fixed (Fixed, HasResolution)
@@ -328,6 +331,13 @@ instance Portray TL.Text where
     | textLengthGT 4096 txt =
         Apply (Name "fromChunks") [List $ portray <$> TL.toChunks txt]
     | otherwise = LitStr (TL.toStrict txt)
+
+instance Portray BS.ByteString where
+  portray = portray . T.pack . BC.unpack
+
+-- | Formats long 'ByteString's as @fromChunks@ to avoid massive allocations.
+instance Portray BL.ByteString where
+  portray = portray . TL.fromChunks . map (T.pack . BC.unpack) . BL.toChunks
 
 instance Portray a => Portray (Ratio a) where
   portray x = Binop (Ident OpIdent "%") (infixl_ 7)
