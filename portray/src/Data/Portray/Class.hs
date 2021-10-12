@@ -31,6 +31,10 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
+#if __GLASGOW_HASKELL__ == 900
+{-# OPTIONS_GHC -Wno-deprecations #-}  -- Want an instance for Option on 9.0.
+#endif
+
 -- | Provides a typeclass for rendering values to pseudo-Haskell syntax.
 
 module Data.Portray.Class
@@ -58,7 +62,12 @@ import Data.Map (Map)
 import Data.Monoid (All, Any, Product, Sum, Dual, Last, First, Ap, Alt)
 import Data.Proxy (Proxy)
 import Data.Ratio (Ratio, numerator, denominator)
-import Data.Semigroup (Option, WrappedMonoid, Max, Min, Arg)
+import Data.Semigroup
+         ( WrappedMonoid, Max, Min, Arg
+#if !MIN_VERSION_base(4, 16, 0)
+         , Option
+#endif
+         )
 import qualified Data.Semigroup as SG
 import Data.Sequence (Seq)
 import Data.Set (Set)
@@ -275,7 +284,17 @@ newtype ShowAtom a = ShowAtom { unShowAtom :: a }
 instance Show a => Portray (ShowAtom a) where
   portray = showAtom . unShowAtom
 
+-- DerivingVia instance carrier for 'show'ing an enum-style sum type and
+-- detecting its name from the result.  This is used for a few types from base
+-- with Show but no Generic.
 newtype ShowName a = ShowName { unShowName :: a }
+
+#if __GLASGOW_HASKELL__ < 810
+-- Older GHCs don't understand that DerivingVia / GND can make a data
+-- constructor necessary even without mentioning it.
+_unused :: a -> ShowName a
+_unused = ShowName
+#endif
 
 instance Show a => Portray (ShowName a) where
   portray = Name . fromString . show . unShowName
@@ -322,8 +341,6 @@ deriving via Wrapped Generic (Last a) instance Portray a => Portray (Last a)
 deriving via Wrapped Generic (First a) instance Portray a => Portray (First a)
 deriving via Wrapped Generic (ZipList a)
   instance Portray a => Portray (ZipList a)
-deriving via Wrapped Generic (Option a)
-  instance Portray a => Portray (Option a)
 deriving via Wrapped Generic (WrappedMonoid a)
   instance Portray a => Portray (WrappedMonoid a)
 deriving via Wrapped Generic (SG.Last a)
@@ -342,10 +359,19 @@ deriving via Wrapped Generic (Ap f a)
 deriving via Wrapped Generic (Alt f a)
   instance Portray (f a) => Portray (Alt f a)
 
+-- 4.15 is released already, and Option is removed at HEAD.  It seems a pretty
+-- safe bet to be forwards-compatible by removing the instance for 4.16 and
+-- later.
+#if !MIN_VERSION_base(4, 16, 0)
+deriving via Wrapped Generic (Option a)
+  instance Portray a => Portray (Option a)
+#endif
+
 #if MIN_VERSION_base(4, 15, 0)
 deriving via Wrapped Generic GeneralCategory instance Portray GeneralCategory
 deriving via Wrapped Generic Fingerprint instance Portray Fingerprint
 #else
+-- These have no Generic instance before 4.15.
 instance Portray GeneralCategory where
   portray = Name . fromString . show
 
