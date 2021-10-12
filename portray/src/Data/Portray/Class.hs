@@ -12,6 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
@@ -57,6 +58,7 @@ import qualified Data.Functor.Sum as F (Sum(..))
 import qualified Data.Functor.Product as F (Product(..))
 import Data.Int (Int8, Int16, Int32, Int64)
 import Data.IntMap (IntMap)
+import Data.IntSet (IntSet)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Map (Map)
 import Data.Monoid (All, Any, Product, Sum, Dual, Last, First, Ap, Alt)
@@ -72,11 +74,13 @@ import qualified Data.Semigroup as SG
 import Data.Sequence (Seq)
 import Data.Set (Set)
 import Data.Text (Text)
+import Data.Tree (Tree)
 import Data.Type.Coercion (Coercion(..))
 import Data.Type.Equality ((:~:)(..))
 import Data.Void (Void)
 import Data.Word (Word8, Word16, Word32, Word64)
 import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
 import GHC.Arr (Array)
 import qualified GHC.Arr as Arr
 import GHC.Exts
@@ -306,6 +310,25 @@ instance Portray Char where
 instance Portray () where portray () = Tuple []
 instance Portray Text where portray = LitStr
 
+-- | Lazily test whether the length of a Text is more than a given number.
+--
+-- 'textLengthGT' never forces more than @n@ characters plus the remainder of
+-- the present chunk, nor even looks to see whether there are further chunks.
+textLengthGT :: Int -> TL.Text -> Bool
+textLengthGT n0 = go n0 . TL.toChunks
+ where
+  go _ [] = False
+  go n (ch:chs) =
+    let !n' = n - T.length ch
+    in  n' < 0 || go n' chs
+
+-- | Formats long 'TL.Text's as @fromChunks@ to avoid massive allocations.
+instance Portray TL.Text where
+  portray txt
+    | textLengthGT 4096 txt =
+        Apply (Name "fromChunks") [List $ portray <$> TL.toChunks txt]
+    | otherwise = LitStr (TL.toStrict txt)
+
 instance Portray a => Portray (Ratio a) where
   portray x = Binop (Ident OpIdent "%") (infixl_ 7)
     (portray $ numerator x)
@@ -470,6 +493,7 @@ instance (IsList a, Portray (Exts.Item a)) => Portray (Wrapped IsList a) where
   portray =
     Apply (Name $ Ident VarIdent "fromList") . pure . portray . Exts.toList
 
+deriving via Wrapped IsList IntSet instance Portray IntSet
 deriving via Wrapped IsList (IntMap a)
   instance Portray a => Portray (IntMap a)
 deriving via Wrapped IsList (Map k a)
@@ -480,6 +504,8 @@ deriving via Wrapped IsList (Seq a)
   instance Portray a => Portray (Seq a)
 deriving via Wrapped IsList (NonEmpty a)
   instance Portray a => Portray (NonEmpty a)
+deriving via Wrapped Generic (Tree a)
+  instance Portray a => Portray (Tree a)
 
 -- Note: intentionally no instance for @'Wrapped1' 'Foldable'@, since that
 -- doesn't ensure that 'fromList' is actually a valid way to construct @f a@.
