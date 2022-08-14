@@ -445,12 +445,10 @@ ppBulletList o s c = \case
   []         -> opener <> closer
   (doc:docs) ->
     P.group $
-      foldl01
-        (\x y -> x <> P.group (P.line' <> y))
-        id
-        mempty
-        (opener <> P.flatAlt " " "" <> doc :
-          zipWith (P.<+>) (repeat separator) docs) <>
+      foldl
+        (\acc x -> acc <> P.group (P.line' <> x))
+        (opener <> P.flatAlt " " "" <> P.align doc)
+        (map (\x -> separator P.<+> P.align x) docs) <>
       P.line' <> closer
  where
   opener = P.annotate Bracket o
@@ -659,7 +657,7 @@ toDocAssocPrecF cfg = \case
     _  -> P.nest 2 $ P.sep
       [ con AssocNope 10
       , ppBulletList "{" "," "}"
-          [ P.nest 4 $ P.sep
+          [ P.nest 2 $ P.sep
               [ ppPrefix sel P.<+> P.annotate Structural "="
               , val AssocNope 0
               ]
