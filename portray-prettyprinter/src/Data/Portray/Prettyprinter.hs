@@ -379,7 +379,7 @@ prettyConfig =
         (\case
           Decimal -> repeat 3 -- Conventional US spacing: powers of 1,000.
           Binary -> repeat 8  -- 8-bit groups.
-          Octal ->  []        -- *shrug* doesn't divide bytes evenly.
+          Octal ->  []        -- /shrug/ doesn't divide bytes evenly.
           Hex -> repeat 8)    -- 32-bit groups.
 
 -- | Convert a 'Portrayal' to a 'Doc'.

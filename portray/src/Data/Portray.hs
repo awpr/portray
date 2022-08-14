@@ -960,13 +960,13 @@ deriving via PortrayFloatLit Double    instance Portray Double
 --
 -- @since 0.3.0
 fixedToLiteral :: forall a. HasResolution a => Fixed a -> FloatLiteral
-fixedToLiteral (MkFixed x) =
+fixedToLiteral it@(MkFixed x) =
   FloatLiteral
     (x < 0)
     (T.pack $ wholePart ++ take fracDigits (fracPart ++ repeat '0'))
     (length wholePart)
  where
-  denom = resolution @_ @a Proxy
+  denom = resolution it
   (whole, frac) = divMod (abs x) denom
   wholePart = show whole
   fracDigits :: Int
