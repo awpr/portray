@@ -1,4 +1,5 @@
 -- Copyright 2018-2021 Google LLC
+-- Copyright 2022 Andrew Pritchard
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -79,7 +80,8 @@ import Type.Reflection (TypeRep, SomeTypeRep(..))
 
 import Data.Portray
          ( Portray(..), Portrayal(..), PortrayalF(..), Fix(..)
-         , IdentKind(..), Ident(..)
+         , IdentKind(..), Ident(..), Base(..)
+         , FloatLiteral(..), SpecialFloatVal(..)
          , Infixity(..), Assoc(..), FactorPortrayal(..)
          , showAtom, portrayType
          )
@@ -267,6 +269,9 @@ deriving via Wrapped Generic Assoc instance Diff Assoc
 deriving via Wrapped Generic IdentKind instance Diff IdentKind
 deriving via Wrapped Generic Ident instance Diff Ident
 deriving via Wrapped Generic Infixity instance Diff Infixity
+deriving via Wrapped Generic Base instance Diff Base
+deriving via Wrapped Generic FloatLiteral instance Diff FloatLiteral
+deriving via Wrapped Generic SpecialFloatVal instance Diff SpecialFloatVal
 deriving via Wrapped Generic (FactorPortrayal a)
   instance Diff a => Diff (FactorPortrayal a)
 deriving via Wrapped Generic (PortrayalF a)

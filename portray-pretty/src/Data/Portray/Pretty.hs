@@ -1,4 +1,5 @@
 -- Copyright 2020-2021 Google LLC
+-- Copyright 2022 Andrew Pritchard
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -106,7 +107,8 @@ import Text.PrettyPrint.HughesPJClass (Pretty(..), PrettyLevel, prettyNormal)
 
 import Data.Portray
          ( Assoc(..), Infixity(..), FactorPortrayal(..)
-         , Ident(..), IdentKind(..)
+         , Ident(..), IdentKind(..), shouldUseScientific
+         , formatFloatLit, formatIntLit, formatSpecialFloat
          , Portray, Portrayal(..), PortrayalF(..)
          , cata, portray
          )
@@ -193,18 +195,24 @@ ppBulletList opener separator closer docs =
 toDocAssocPrecF :: PortrayalF DocAssocPrec -> DocAssocPrec
 toDocAssocPrecF = \case
   NameF nm -> \_ _ -> ppPrefix nm
-  LitIntF x -> \_ _ -> P.text (show x)
-  LitRatF x -> \_ _ -> P.text (show (fromRational x :: Double))
+  LitIntBaseF b x -> \_ _ -> P.text $ T.unpack $ formatIntLit b x
+
+  LitFloatF x -> \_ _ ->
+    P.text $ T.unpack $ formatFloatLit (shouldUseScientific x) x
+
+  SpecialFloatF x -> \_ _ -> P.text $ T.unpack $ formatSpecialFloat x
   LitStrF x -> \_ _ -> P.text (show x)
   LitCharF x -> \_ _ -> P.text (show x)
   OpaqueF txt -> \_ _ -> P.text (T.unpack txt)
   ApplyF fn [] -> \_ _ -> fn AssocL 10
+
   ApplyF fn xs -> \lr p ->
     P.maybeParens (not $ fixityCompatible (Infixity AssocL 10) lr p) $
       P.sep
         [ fn AssocL 10
         , P.nest 2 $ P.sep $ xs <&> \docprec -> docprec AssocR 10
         ]
+
   BinopF nm fx x y -> ppBinop nm fx x y
   TupleF xs -> \_ _ -> ppBulletList "(" "," ")" $ xs <&> \x -> x AssocNope (-1)
   ListF xs -> \_ _ -> ppBulletList "[" "," "]" $ xs <&> \x -> x AssocNope (-1)

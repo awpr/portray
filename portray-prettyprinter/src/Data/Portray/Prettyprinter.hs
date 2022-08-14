@@ -1,4 +1,5 @@
 -- Copyright 2021 Google LLC
+-- Copyright 2022 Andrew Pritchard
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -133,6 +134,8 @@ import Data.Portray
          , Ident(..), IdentKind(..)
          , Portray, Portrayal(..), PortrayalF(..)
          , cata, portray
+         , Base, FloatLiteral, shouldUseScientific
+         , formatIntLit, formatFloatLit, formatSpecialFloat
          )
 import Data.Portray.Diff (Diff(..))
 
@@ -476,6 +479,14 @@ ppStrLit cfg unescaped =
 
   backslashBreak = P.annotate EscapeSequence $ "\\" <> P.line' <> "\\"
 
+ppIntLit :: Base -> Integer -> Doc SyntaxClass
+ppIntLit b x = P.annotate (Literal IntLit) $ text $ formatIntLit b x
+
+ppFloatLit :: FloatLiteral -> Doc SyntaxClass
+ppFloatLit x =
+  -- TODO(awpr): configurable scientific notation?
+  P.annotate (Literal RatLit) $ text $ formatFloatLit (shouldUseScientific x) x
+
 -- | Render one layer of 'PortrayalF' to 'DocAssocPrec'.
 toDocAssocPrecF
   :: Config
@@ -483,27 +494,36 @@ toDocAssocPrecF
   -> DocAssocPrec SyntaxClass
 toDocAssocPrecF cfg = \case
   NameF nm -> \_ _ -> ppPrefix nm
-  LitIntF x -> \_ _ -> P.annotate (Literal IntLit) $ pretty x
-  LitRatF x -> \_ _ ->
-    P.annotate (Literal RatLit) $ pretty (fromRational x :: Double)
+  LitIntBaseF base x -> \_ _ -> ppIntLit base x
+  LitFloatF x -> \_ _ -> ppFloatLit x
+
+  SpecialFloatF x -> \_ _ ->
+    P.annotate Structural $ text $ -- Different color from numeric float lits.
+    formatSpecialFloat x
+
   LitStrF x -> \_ _ -> ppStrLit cfg x
+
   LitCharF x -> \_ _ ->
     -- Likewise Char
     P.annotate (Literal CharLit) $
     P.enclose "'" "'" $
     (if litCharIsEscaped cfg x then P.annotate EscapeSequence else id) $
     text $ escapeLitChar cfg x
+
   OpaqueF txt -> \_ _ -> text txt
   ApplyF fn [] -> \_ _ -> fn AssocL 10
+
   ApplyF fn xs -> \lr p ->
     maybeParens (not $ fixityCompatible (Infixity AssocL 10) lr p) $
       P.nest 2 $ P.sep
         [ fn AssocL 10
         , P.sep $ xs <&> \docprec -> docprec AssocR 10
         ]
+
   BinopF nm fx x y -> ppBinop nm fx x y
   TupleF xs -> \_ _ -> ppBulletList "(" "," ")" $ xs <&> \x -> x AssocNope (-1)
   ListF xs -> \_ _ -> ppBulletList "[" "," "]" $ xs <&> \x -> x AssocNope (-1)
+
   LambdaCaseF xs -> \_ p ->
     maybeParens (p >= 10) $
       P.nest 2 $ P.sep
@@ -516,6 +536,7 @@ toDocAssocPrecF cfg = \case
             | (pat, val) <- xs
             ]
         ]
+
   RecordF con sels -> \_ _ -> case sels of
     [] -> con AssocNope (-1)
     _  -> P.nest 2 $ P.sep
@@ -528,16 +549,19 @@ toDocAssocPrecF cfg = \case
           | FactorPortrayal sel val <- sels
           ]
       ]
+
   TyAppF val ty -> \_ _ ->
     P.nest 2 $ P.sep
       [ val AssocNope 10
       , P.annotate Structural "@" <> ty AssocNope 10
       ]
+
   TySigF val ty -> \_ p -> maybeParens (p >= 0) $
     P.nest 2 $ P.sep
       [ val AssocNope 0
       , P.annotate Structural "::" P.<+> ty AssocNope 0
       ]
+
   QuotF nm content -> \_ _ ->
     P.nest 2 $ P.sep
       [ P.annotate Structural "[" <>
@@ -546,6 +570,7 @@ toDocAssocPrecF cfg = \case
       , content AssocNope (-1)
       , P.annotate Structural "|]"
       ]
+
   UnlinesF ls -> \_ _ -> P.vcat (ls <&> \l -> l AssocNope (-1))
   NestF n x -> \_ _ -> P.nest n (x AssocNope (-1))
 

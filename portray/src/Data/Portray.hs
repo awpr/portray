@@ -1,4 +1,5 @@
 -- Copyright 2020-2021 Google LLC
+-- Copyright 2022 Andrew Pritchard
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -14,6 +15,7 @@
 
 -- | Provides a compatibility layer of Haskell-like terms for pretty-printers.
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -40,7 +42,10 @@
 module Data.Portray
          ( -- * Syntax Tree
            Portrayal
-             ( Name, LitInt, LitRat, LitStr, LitChar, Opaque
+             ( Name
+             , LitInt, LitIntBase
+             , LitRat, LitFloat, SpecialFloat
+             , LitStr, LitChar, Opaque
              , Apply, Binop, Tuple, List
              , LambdaCase, Record, TyApp, TySig
              , Quot, Unlines, Nest
@@ -48,33 +53,47 @@ module Data.Portray
              )
          , FactorPortrayal(..)
          , IdentKind(..), Ident(..)
+           -- ** Numeric Literals
+           -- *** Integral Literals
+         , Base(..), baseToInt, basePrefix, formatIntLit
+           -- *** Floating-Point Literals
+         , FloatLiteral(..), floatToLiteral, floatLiteralToRational
+         , normalizeFloatLit, trimFloatLit, formatFloatLit
+         , shouldUseScientific
+         , SpecialFloatVal(..), formatSpecialFloat
            -- ** Operator Fixity
          , Assoc(..), Infixity(..), infix_, infixl_, infixr_
            -- ** Base Functor
-         , PortrayalF(..)
+         , PortrayalF(.., LitIntF, LitRatF)
            -- * Class
          , Portray(..)
            -- ** Via Generic
          , GPortray(..), GPortrayProduct(..)
-           -- ** Via Show, Integral, and Real
-         , PortrayIntLit(..), PortrayRatLit(..), ShowAtom(..)
+           -- ** Via Show, Integral, Real, and RealFrac
+         , PortrayIntLit(..), PortrayRatLit(..), PortrayFloatLit(..)
+         , ShowAtom(..)
            -- * Convenience
          , showAtom, strAtom, strQuot, strBinop
            -- * Miscellaneous
          , Fix(..), cata, portrayCallStack, portrayType
+         , showIntInBase
          ) where
 
-import Data.Char (isAlpha, isDigit, isUpper)
+import Data.Bifunctor (second)
+import Data.Char (digitToInt, intToDigit, isAlpha, isDigit, isUpper)
 import Data.Coerce (Coercible, coerce)
+import Data.Fixed (Fixed(..), HasResolution(..))
 import Data.Functor.Identity (Identity(..))
 import Data.Functor.Const (Const(..))
 import Data.Int (Int8, Int16, Int32, Int64)
 import Data.IntMap (IntMap)
 import Data.Kind (Type)
+import Data.List (foldl')
 import Data.List.NonEmpty (NonEmpty)
 import Data.Map (Map)
-import Data.Proxy (Proxy)
-import Data.Ratio (Ratio, numerator, denominator)
+import Data.Proxy (Proxy(..))
+import Data.Ratio (Ratio, (%), numerator, denominator)
+import Data.Semigroup (Sum(..), Product(..))
 import Data.Sequence (Seq)
 import Data.Set (Set)
 import Data.String (IsString)
@@ -86,6 +105,7 @@ import Data.Word (Word8, Word16, Word32, Word64)
 import qualified Data.Text as T
 import GHC.Exts (IsList, proxy#)
 import qualified GHC.Exts as Exts
+import GHC.Float (floatToDigits)
 import GHC.Generics
          ( (:*:)(..), (:+:)(..)
          , Generic(..), Rep
@@ -95,8 +115,17 @@ import GHC.Generics
          , Selector, selName
          , Fixity(..), Associativity(..)
          )
+import GHC.Real (infinity, notANumber)
 import GHC.Stack (CallStack, SrcLoc, getCallStack, prettySrcLoc)
 import GHC.TypeLits (KnownSymbol, symbolVal')
+import Numeric
+         ( showOct, showInt, showHex
+#if MIN_VERSION_base(4, 16, 0)
+         , showBin
+#else
+         , showIntAtBase
+#endif
+         )
 import Numeric.Natural (Natural)
 import Type.Reflection
          ( TyCon, TypeRep, SomeTypeRep(..)
@@ -150,14 +179,237 @@ instance IsString Ident where
         | otherwise -> OpIdent
       "" -> VarIdent -- /shrug/
 
+-- The (supported) base used for an integral literal.
+--
+-- @since 0.3.0
+data Base = Binary | Octal | Decimal | Hexadecimal
+  deriving (Eq, Ord, Read, Show, Generic)
+  deriving Portray via Wrapped Generic Base
+
+-- | Convert the given base to its numerical value.
+--
+-- @since 0.3.0
+baseToInt :: Base -> Int
+baseToInt = \case { Binary -> 2; Octal -> 8; Decimal -> 10; Hexadecimal -> 16 }
+
+#if !MIN_VERSION_base(4, 16, 0)
+showBin :: (Show a, Integral a) => a -> ShowS
+showBin = showIntAtBase 2 (\case 0 -> '0'; _ -> '1')
+#endif
+
+-- | Show /non-negative/ 'Integral' numbers in the given conventional base.
+--
+-- @since 0.3.0
+showIntInBase :: (Show a, Integral a) => Base -> a -> ShowS
+showIntInBase =
+  \case
+    Binary -> showBin
+    Octal -> showOct
+    Decimal -> showInt
+    Hexadecimal -> showHex
+
+-- | Format an integral literal in the given base.
+--
+-- @since 0.3.0
+formatIntLit :: (Show a, Integral a) => Base -> a -> Text
+formatIntLit b x =
+  sign <> basePrefix b <> T.pack (showIntInBase b (abs x) "")
+ where
+  sign
+   | x < 0 = "-"
+   | otherwise = ""
+
+-- | The syntactic marker prefix for the given base, e.g. "0x" for hex.
+--
+-- @since 0.3.0
+basePrefix :: Base -> Text
+basePrefix =
+  \case { Binary -> "0b"; Octal -> "0o"; Decimal -> ""; Hexadecimal -> "0x" }
+
+-- [Note: Rational literals]
+--
+-- Rational literals are a bit of an interesting case.  It might appear to be
+-- simple: just represent them as a 'Rational' like the AST does, and format
+-- them as needed.  Unfortunately, that doesn't behave well: different
+-- 'Fractional' types have differing amounts of precision and different ways of
+-- placing that precision w.r.t. the radix point; so the number of digits that
+-- should be shown for a given exact 'Rational' can vary between types.  That
+-- functionality in "base" is behind an API that gets info about the type's
+-- precision via a typeclass, so type-erasing it for the AST and continuing to
+-- use that API in the backends isn't particularly feasible.  Additionally,
+-- conversion to 'Rational' erases the distinction between signed zeros.
+--
+-- To get around these issues, we have 'Portray' instances do the conversion to
+-- digits themselves, so each instance can call the appropriate instance of
+-- 'floatToDigits', and then let the backends decide what to do with those
+-- digits.  In addition to the raw digits themselves, we need the sign and
+-- exponent.  It's left up to the backends to decide whether to use scientific
+-- notation, include a trailing decimal point, numeric underscores, etc.
+--
+-- On top of this, many floating-point types include infinite and non-numeric
+-- values.  Although Haskell syntax does not include these, the values do
+-- exist, and we need some way to represent them.  As a compromise to
+-- pragmatism and aesthetics, we'll augment the Haskell syntax with native
+-- syntax for positive and negative infinities and a NaN constant, to give
+-- backends the opportunity to decide what to do with these exotic values,
+-- rather than expecting instances to produce something unwieldy like
+-- @fromRational (negate infinity)@.
+
+-- | A representation of a float literal as its digits, sign, and exponent.
+--
+-- The choice of whether to represent a literal with leading zeros or a smaller
+-- exponent is assumed not to be meaningful.  Trailing zeros may be included to
+-- imply that the value is given with additional precision beyond the last
+-- nonzero digit; backends may choose to include these or trim them.
+--
+-- The value represented by @FloatLiteral sign digits e@ is
+-- @sign * 0.<digits> * 10^e@, which is to say the radix point falls before
+-- index @e@ of @digits@.
+--
+-- @since 0.3.0
+data FloatLiteral = FloatLiteral
+  { flNegate :: !Bool
+  , flDigits :: !Text -- ^ Expected to be ASCII digits.
+  , flExponent :: !Int
+  }
+  deriving (Eq, Ord, Read, Show, Generic)
+  deriving Portray via Wrapped Generic FloatLiteral
+
+-- | Extract a 'Rational' value representation of the 'FloatLiteral'.
+--
+-- @since 0.3.0
+floatLiteralToRational :: FloatLiteral -> Rational
+floatLiteralToRational x = num % denom
+ where
+  applySign
+    | flNegate x = negate
+    | otherwise = id
+
+  mantissa =
+    foldl'
+      (\d acc -> 10*acc + d)
+      0
+      (map (toInteger . digitToInt) $ T.unpack $ flDigits x)
+  e = toInteger $ flExponent x
+  num = applySign mantissa * 10 ^ max 0 e
+  denom = 10 ^ max 0 (negate e)
+
+negativeZero :: FloatLiteral
+negativeZero = FloatLiteral True "0" 0
+
+-- | Convert a finite 'RealFloat' value to a 'FloatLiteral'.
+--
+-- @since 0.3.0
+floatToLiteral :: RealFloat a => a -> FloatLiteral
+floatToLiteral x
+  | isNegativeZero x = negativeZero
+  | otherwise =
+      let (digits, e) = floatToDigits 10 x
+      in  FloatLiteral (x < 0) (T.pack (map intToDigit digits)) e
+
+-- | Normalize a float literal to have no leading zero digits, if nonzero.
+--
+-- @since 0.3.0
+normalizeFloatLit :: FloatLiteral -> FloatLiteral
+normalizeFloatLit (FloatLiteral n d e)
+  -- Leave all-zero digit strings alone: we can't identify any of the zeros as
+  -- meaningless "leading" zeros vs. precision-implying "trailing" zeros.
+  | T.null rest = FloatLiteral n d e
+  | otherwise = FloatLiteral n rest (e - T.length zeros)
+ where
+  (zeros, rest) = T.span (=='0') d
+
+-- This isn't in "text" for some reason.
+spanEnd :: (Char -> Bool) -> Text -> (Text, Text)
+#if MIN_VERSION_text(2, 0, 1)
+spanEnd f = runIdentity . T.spanEndM (Identity . f)
+#else
+spanEnd f x =
+  let (r, l) = T.span f (T.reverse x)
+  in  (T.reverse l, T.reverse r)
+#endif
+
+-- | Trim trailing zeros of a float literal.
+--
+-- These trailing zeros are presumed to mean that the value is given to a
+-- particular level of precision, so trimming them before output means the
+-- output no longer includes this implied precision information.
+--
+-- @since 0.3.0
+trimFloatLit :: FloatLiteral -> FloatLiteral
+trimFloatLit (FloatLiteral n d e)
+  | T.null rest = FloatLiteral n "0" 1  -- "0.", not ".0"
+  | otherwise = FloatLiteral n rest e
+ where
+  (rest, _) = spanEnd (=='0') d
+
+-- | A default heuristic for whether a literal should use scientific notation.
+--
+-- This returns 'True' when using scientific notation would let us avoid
+-- padding the digits with more than one extra zero.
+--
+-- @since 0.3.0
+shouldUseScientific :: FloatLiteral -> Bool
+shouldUseScientific (FloatLiteral _ d e) = e < -1 || e > T.length d + 1
+
+-- | Format a 'FloatLiteral' to 'Text' in the conventional way.
+--
+-- @since 0.3.0
+formatFloatLit :: Bool -> FloatLiteral -> Text
+formatFloatLit scientific (FloatLiteral neg digits e) =
+  sign <> whole <> frac <> ex
+ where
+  sign = if neg then "-" else ""
+
+  radixPoint
+    | scientific = 1
+    | otherwise = e
+
+  n = T.length digits
+  (whole, frac)
+    | radixPoint <= 0 = ("0", "." <> T.replicate (-radixPoint) "0" <> digits)
+    | radixPoint >= n = (digits <> T.replicate (radixPoint - n) "0", "")
+    | otherwise = second ("." <>) $ T.splitAt radixPoint digits
+
+  ex
+    | scientific = "e" <> T.pack (show (e - 1))
+    | otherwise = ""
+
+
+-- | Special floating-point values including NaNs and infinities.
+--
+-- @since 0.3.0
+data SpecialFloatVal = NaN | Infinity { infNegate :: Bool }
+  deriving (Eq, Ord, Read, Show, Generic)
+  deriving Portray via Wrapped Generic SpecialFloatVal
+
+-- | Format a 'SpecialFloatVal' to 'Text' in the conventional way.
+--
+-- @since 0.3.0
+formatSpecialFloat :: SpecialFloatVal -> Text
+formatSpecialFloat = \case
+  NaN -> "NaN"
+  Infinity neg -> (if neg then "-" else "") <> "Infinity"
+
 -- | A single level of pseudo-Haskell expression; used to define 'Portrayal'.
 data PortrayalF a
   = NameF {-# UNPACK #-} !Ident
     -- ^ An identifier, including variable, constructor and operator names.
-  | LitIntF !Integer
-    -- ^ An integral literal.  e.g. @42@
-  | LitRatF {-# UNPACK #-} !Rational
+  | LitIntBaseF !Base !Integer
+    -- ^ An integral literal with a particular base.  e.g. @42@, @0o777@
+    --
+    -- For example, a POSIX file mode type might wish to be printed as
+    -- specifically octal integral literals.
+    --
+    -- @since 0.3.0
+  | LitFloatF {-# UNPACK #-} !FloatLiteral
     -- ^ A rational / floating-point literal.  e.g. @42.002@
+    --
+    -- @since 0.3.0
+  | SpecialFloatF !SpecialFloatVal
+    -- ^ A "special" floating-point value.  e.g. @NaN@ or @-Infinity@
+    --
+    -- @since 0.3.0
   | LitStrF !Text
     -- ^ A string literal, stored without escaping or quotes.  e.g. @"hi"@
   | LitCharF !Char
@@ -188,6 +440,47 @@ data PortrayalF a
     -- ^ A subdocument indented by the given number of columns.
   deriving (Eq, Ord, Read, Show, Functor, Foldable, Traversable, Generic)
   deriving Portray via Wrapped Generic (PortrayalF a)
+
+-- | Backwards compat: 'LitIntBaseF' without the base.
+--
+-- When matching, this ignores the base; when constructing, it chooses decimal.
+pattern LitIntF :: Integer -> PortrayalF a
+pattern LitIntF x <- LitIntBaseF _ x
+ where LitIntF x = LitIntBaseF Decimal x
+
+matchLitRat :: PortrayalF a -> Maybe Rational
+matchLitRat (LitFloatF x) = Just (floatLiteralToRational x)
+matchLitRat (SpecialFloatF x) = Just $ case x of
+  NaN -> notANumber
+  Infinity neg -> (if neg then negate else id) infinity
+matchLitRat _ = Nothing
+
+buildLitRat :: Rational -> PortrayalF a
+buildLitRat x
+  | x == infinity = SpecialFloatF (Infinity False)
+  | x == -infinity = SpecialFloatF (Infinity True)
+  | x == notANumber = SpecialFloatF NaN
+  | otherwise = LitFloatF $ floatToLiteral (fromRational x :: Double)
+
+-- | Backwards compat: rational values including NaNs and infinities.
+--
+-- When matching, this ignores the format; when constructing, it chooses
+-- according to the same criteria as 'showGFloat'.
+pattern LitRatF :: Rational -> PortrayalF a
+pattern LitRatF x <- (matchLitRat -> Just x)
+ where LitRatF x = buildLitRat x
+
+-- Backwards compat: matching on all the constructor names of PortrayalF in
+-- 0.2.0 is still complete.
+--
+-- For whatever reason, this pragma doesn't seem to be honored downstream in at
+-- least some cases, but we may as well have it.
+{-# COMPLETE
+      NameF, LitIntF, LitRatF, LitStrF, LitCharF,
+      OpaqueF, ApplyF, BinopF, TupleF, ListF,
+      LambdaCaseF, RecordF, TyAppF, TySigF, QuotF,
+      UnlinesF, NestF
+  #-}
 
 -- | A 'Portrayal' along with a field name; one piece of a record literal.
 data FactorPortrayal a = FactorPortrayal
@@ -226,9 +519,18 @@ newtype Portrayal = Portrayal { unPortrayal :: Fix PortrayalF }
   deriving stock (Eq, Generic)
   deriving newtype (Portray, Show, Read)
 
+-- Matching the full set of 0.2.0 patterns still covers all cases.
 {-# COMPLETE
       Name, LitInt, LitRat, LitStr, LitChar, Opaque, Apply, Binop, Tuple,
       List, LambdaCase, Record, TyApp, TySig, Quot, Unlines, Nest
+  #-}
+
+-- Or, match all of the up-to-date constructors.  I'll not go out of the way to
+-- permit mixing new and old by making combinatorially many COMPLETE pragmas.
+{-# COMPLETE
+      Name, LitIntBase, LitFloat, SpecialFloat, LitStr, LitChar,
+      Opaque, Apply, Binop, Tuple, List,
+      LambdaCase, Record, TyApp, TySig, Quot, Unlines, Nest
   #-}
 
 -- An explicitly-bidirectional pattern synonym that makes it possible to write
@@ -252,13 +554,37 @@ pattern Name :: Ident -> Portrayal
 pattern Name nm = Portrayal (Fix (NameF nm))
 
 -- | An integral literal.
+--
+-- This pattern does not round-trip, as it ignores the base when matching and
+-- provides base 10 when constructing.  Prefer 'LitIntBase' when matching if
+-- the base is relevant, but it should be fine to construct by this pattern if
+-- base 10 is desired.
 pattern LitInt :: Integer -> Portrayal
 pattern LitInt x = Portrayal (Fix (LitIntF x))
 
+-- | An integral literal in the given base.
+--
+-- @since 0.3.0
+pattern LitIntBase :: Base -> Integer -> Portrayal
+pattern LitIntBase b x = Portrayal (Fix (LitIntBaseF b x))
 
 -- | A rational / floating-point literal.
+--
+-- Discouraged for new uses; use 'LitFloat' instead if possible.
 pattern LitRat :: Rational -> Portrayal
 pattern LitRat x = Portrayal (Fix (LitRatF x))
+
+-- | A rational / floating-point literal.
+--
+-- @since 0.3.0
+pattern LitFloat :: FloatLiteral -> Portrayal
+pattern LitFloat x = Portrayal (Fix (LitFloatF x))
+
+-- | A special (infinite or NaN) floating-point value.
+--
+-- @since 0.3.0
+pattern SpecialFloat :: SpecialFloatVal -> Portrayal
+pattern SpecialFloat x = Portrayal (Fix (SpecialFloatF x))
 
 -- | A string literal.
 --
@@ -596,13 +922,43 @@ deriving via PortrayIntLit Word64    instance Portray Word64
 deriving via PortrayIntLit Natural   instance Portray Natural
 
 -- | A newtype wrapper providing a 'Portray' instance via 'Real'.
+--
+-- Discouraged for new uses: use 'PortrayFloatLit' instead if possible.
 newtype PortrayRatLit a = PortrayRatLit a
 
 instance Real a => Portray (PortrayRatLit a) where
   portray (PortrayRatLit x) = LitRat (toRational x)
 
-deriving via PortrayRatLit Float     instance Portray Float
-deriving via PortrayRatLit Double    instance Portray Double
+-- | A newtype wrapper providing a 'Portray' instance via 'RealFloat'.
+--
+-- @since 0.3.0
+newtype PortrayFloatLit a = PortrayFloatLit a
+
+instance RealFloat a => Portray (PortrayFloatLit a) where
+  portray (PortrayFloatLit x)
+    | isInfinite x = SpecialFloat (Infinity (x < 0))
+    | isNaN x = SpecialFloat NaN
+    | otherwise = LitFloat (floatToLiteral x)
+
+deriving via PortrayFloatLit Float     instance Portray Float
+deriving via PortrayFloatLit Double    instance Portray Double
+
+fixedToLiteral :: forall a. HasResolution a => Fixed a -> FloatLiteral
+fixedToLiteral (MkFixed x) =
+  FloatLiteral
+    (x < 0)
+    (T.pack $ wholePart ++ take fracDigits (fracPart ++ repeat '0'))
+    (length wholePart)
+ where
+  denom = resolution @_ @a Proxy
+  (whole, frac) = divMod (abs x) denom
+  wholePart = show whole
+  fracDigits :: Int
+  fracDigits = ceiling $ (logBase 10 (fromIntegral denom) :: Double)
+  fracPart = show $ (frac * 10 ^ fracDigits + denom - 1) `div` denom
+
+instance HasResolution a => Portray (Fixed a) where
+  portray = LitFloat . fixedToLiteral
 
 -- | A newtype wrapper providing a 'Portray' instance via 'showAtom'.
 --
@@ -655,6 +1011,20 @@ instance Portray a => Portray [a] where
 
 deriving via Wrapped Generic (Proxy a) instance Portray (Proxy a)
 
+-- A few newtypes in 'base' propagate syntax-carrying instances like 'Num' and
+-- 'Fractional' that some 'Portray' instances use as their output format.  For
+-- these, we peek at the inner value's 'Portrayal' and, if it's syntax that
+-- would be supported by the newtype, omit the constructor.
+
+instance Portray a => Portray (Sum a) where
+  portray (Sum x) = case portray x of
+    LitInt n -> LitInt n
+    p -> Apply (Name $ Ident ConIdent "Sum") [p]
+
+instance Portray a => Portray (Product a) where
+  portray (Product x) = case portray x of
+    LitInt n -> LitInt n
+    p -> Apply (Name $ Ident ConIdent "Product") [p]
 
 instance Portray TyCon where
   portray tc = case nm of
