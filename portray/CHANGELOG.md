@@ -1,3 +1,10 @@
+# 0.3.0
+
+* Change integral literals to express a preferred base.
+* Change floating-point literals to be pre-converted to digits.
+* Add a representation of infinite and NaN values.
+* Add several utility functions for formatting int and float literals.
+
 # 0.2.0
 
 * Split Atom into literals, identifiers, and opaque text.

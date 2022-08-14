@@ -14,7 +14,7 @@
 # limitations under the License.
 
 name: portray
-version: 0.2.0
+version: 0.3.0
 category: Text
 synopsis: Rendering to pseudo-Haskell syntax
 description: |

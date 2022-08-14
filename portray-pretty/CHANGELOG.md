@@ -1,6 +1,10 @@
+# 0.1.0.3
+
+* Update to `portray-0.3.0`.
+
 # 0.1.0.2
 
-* Update to portray-0.2.0
+* Update to `portray-0.2.0`.
 
 # 0.1.0.1
 

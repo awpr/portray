@@ -5,7 +5,7 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           portray
-version:        0.2.0
+version:        0.3.0
 synopsis:       Rendering to pseudo-Haskell syntax
 description:    This provides a single place to describe how a type should be formatted as
                 pseudo-Haskell syntax, independently of the actual pretty-printing library
