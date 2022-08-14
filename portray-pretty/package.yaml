@@ -29,7 +29,7 @@ license: Apache-2.0
 author: Andrew Pritchard <awpritchard@gmail.com>
 copyright: 2020-2021 Google LLC; 2022 Andrew Pritchard
 maintainer: Andrew Pritchard <awpritchard@gmail.com>
-github: google/hs-portray/portray-pretty
+github: awpr/portray/portray-pretty
 
 # Note: this causes CHANGELOG.md to be included in Hackage distributions.
 extra-source-files:

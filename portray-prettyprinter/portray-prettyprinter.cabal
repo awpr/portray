@@ -26,8 +26,8 @@ description:    This provides a
                 Try using 'pp' as the print function in GHCi:
                 @:set -interactive-print=Data.Portray.Prettyprinter.pp@!
 category:       Text
-homepage:       https://github.com/google/hs-portray#readme
-bug-reports:    https://github.com/google/hs-portray/issues
+homepage:       https://github.com/awpr/portray#readme
+bug-reports:    https://github.com/awpr/portray/issues
 author:         Andrew Pritchard <awpritchard@gmail.com>
 maintainer:     Andrew Pritchard <awpritchard@gmail.com>
 copyright:      2021 Google LLC; 2022 Andrew Pritchard
@@ -39,7 +39,7 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/google/hs-portray
+  location: https://github.com/awpr/portray
   subdir: portray-prettyprinter
 
 library

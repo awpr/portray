@@ -25,7 +25,7 @@ license: Apache-2.0
 author: Reiner Pope <reinerp@google.com>, Andrew Pritchard <awpritchard@gmail.com>
 copyright: 2018-2021 Google LLC; 2022 Andrew Pritchard
 maintainer: Reiner Pope <reinerp@google.com>, Andrew Pritchard <awpritchard@gmail.com>
-github: google/hs-portray/portray-diff
+github: awpr/portray/portray-diff
 
 # Note: this causes CHANGELOG.md to be included in Hackage distributions.
 extra-source-files:
