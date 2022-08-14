@@ -195,10 +195,10 @@ ppBulletList opener separator closer docs =
 toDocAssocPrecF :: PortrayalF DocAssocPrec -> DocAssocPrec
 toDocAssocPrecF = \case
   NameF nm -> \_ _ -> ppPrefix nm
-  LitIntBaseF b x -> \_ _ -> P.text $ T.unpack $ formatIntLit b x
+  LitIntBaseF b x -> \_ _ -> P.text $ T.unpack $ formatIntLit b [] x
 
   LitFloatF x -> \_ _ ->
-    P.text $ T.unpack $ formatFloatLit (shouldUseScientific x) x
+    P.text $ T.unpack $ formatFloatLit (shouldUseScientific x) [] x
 
   SpecialFloatF x -> \_ _ -> P.text $ T.unpack $ formatSpecialFloat x
   LitStrF x -> \_ _ -> P.text (show x)

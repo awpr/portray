@@ -1,4 +1,5 @@
 -- Copyright 2021 Google LLC
+-- Copyright 2022 Andrew Pritchard
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -22,6 +23,7 @@
 
 module Main where
 
+import Data.Fixed (Fixed, E3)
 import Data.Function ((&))
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -76,11 +78,91 @@ propStringRoundTrips cfg t =
 propCharRoundTrips :: Config -> Char -> Property
 propCharRoundTrips cfg c = c === read (T.unpack $ showPortrayalCfg cfg c)
 
+altShowPortrayal :: Portrayal -> Text
+altShowPortrayal =
+  styleShowPortrayal
+    (prettyConfig & setTrimTrailingFloatZeros True)
+    (const mempty)
+
 main :: IO ()
 main = defaultMain
-  [ testGroup "Atom"
-      [ testCase "()" $ basicShowPortrayal (Tuple []) @?= "()"
-      , testCase "2" $ basicShowPortrayal (LitInt 2) @?= "2"
+  [ testGroup "LitInt"
+      [ testCase "2" $ basicShowPortrayal (LitInt 2) @?= "2"
+      , testCase "1000" $ basicShowPortrayal (LitInt 1000) @?= "1000"
+
+      , testCase "0o123" $
+          basicShowPortrayal (LitIntBase Octal 0o123) @?= "0o123"
+
+      , testCase "0b10000000" $
+          basicShowPortrayal (LitIntBase Binary 128) @?= "0b10000000"
+
+      , testCase "0xdeadbeef" $
+          basicShowPortrayal (LitIntBase Hex 0xdeadbeef) @?=
+            "0xdeadbeef"
+
+      , testCase "2_" $ altShowPortrayal (LitInt 2) @?= "2"
+      , testCase "1_000" $ altShowPortrayal (LitInt 1000) @?= "1_000"
+      , testCase "1_000_000" $ altShowPortrayal (LitInt 1000000) @?= "1_000_000"
+
+      , testCase "0o123456" $
+          altShowPortrayal (LitIntBase Octal 0o123456) @?= "0o123456"
+
+      , testCase "0b1_00001000" $
+          altShowPortrayal (LitIntBase Binary 0x0108) @?= "0b1_00001000"
+
+      , testCase "0xfeedface_deadbeef" $
+          altShowPortrayal (LitIntBase Hex 0xfeedfacedeadbeef) @?=
+            "0xfeedface_deadbeef"
+      ]
+
+  , testGroup "LitFloat"
+      [ testCase "2" $
+          basicShowPortrayal (LitFloat (floatToLiteral (2 :: Float))) @?= "2"
+
+      , testCase "1e6" $
+          basicShowPortrayal (LitFloat (floatToLiteral (1e6 :: Float))) @?=
+            "1e6"
+
+      , testCase "1.02e-4" $
+          basicShowPortrayal (LitFloat (floatToLiteral (1.02e-4 :: Float))) @?=
+            "1.02e-4"
+
+      , testCase "5/3" $
+          basicShowPortrayal (LitFloat (floatToLiteral (5/3 :: Float))) @?=
+            "1.6666666"
+
+      , testCase "2.000" $
+          basicShowPortrayal (LitFloat (fixedToLiteral (2 :: Fixed E3))) @?=
+            "2.000"
+
+      , testCase "2000.000" $
+          basicShowPortrayal (LitFloat (fixedToLiteral (2000 :: Fixed E3))) @?=
+            "2000.000"
+
+      , testCase "5/3 :: Double" $
+          basicShowPortrayal (LitFloat (floatToLiteral (5/3 :: Double))) @?=
+            "1.6666666666666667"
+
+      , testCase "5000/3" $
+          basicShowPortrayal (LitFloat (floatToLiteral (5000/3 :: Float))) @?=
+            "1666.6666"
+
+      , testCase "5_000/3" $
+          altShowPortrayal (LitFloat (floatToLiteral (5000/3 :: Float))) @?=
+            "1_666.6666"
+
+      , testCase "2 :: Fixed E3" $
+          altShowPortrayal (LitFloat (fixedToLiteral (2 :: Fixed E3))) @?= "2"
+
+      , testCase "2e3 :: Fixed E3" $
+          altShowPortrayal (LitFloat (fixedToLiteral (2000 :: Fixed E3))) @?=
+            "2e3"
+
+      , testCase "NaN" $ basicShowPortrayal (SpecialFloat NaN) @?= "NaN"
+      , testCase "Infinity" $
+          basicShowPortrayal (SpecialFloat $ Infinity False) @?= "Infinity"
+      , testCase "-Infinity" $
+          basicShowPortrayal (SpecialFloat $ Infinity True) @?= "-Infinity"
       ]
 
   , testGroup "Apply"
@@ -158,7 +240,8 @@ main = defaultMain
       ]
 
   , testGroup "Tuple"
-      [ testCase "pair" $
+      [ testCase "nullary" $ basicShowPortrayal (Tuple []) @?= "()"
+      , testCase "pair" $
           basicShowPortrayal (Tuple [LitInt 2, LitInt 4]) @?= "(2, 4)"
       , testCase "triple" $
           basicShowPortrayal (Tuple [LitInt 2, LitInt 4, LitInt 6]) @?=

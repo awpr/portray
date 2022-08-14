@@ -98,9 +98,12 @@ module Data.Portray.Prettyprinter
          , WrappedPortray(..)
            -- * Rendering
            -- ** Configuration
-         , Config, defaultConfig
+         , Config, defaultConfig, prettyConfig
            -- *** Escape Sequences
          , setShouldEscapeChar, escapeNonASCII, escapeSpecialOnly
+           -- *** Numeric Literals
+         , setTrimTrailingFloatZeros, setScientificNotationThreshold
+         , setSeparatorGroupSizes
            -- ** Colorization
          , SyntaxClass(..), LitKind(..)
          , defaultStyling, subtleStyling, noStyling
@@ -134,8 +137,9 @@ import Data.Portray
          , Ident(..), IdentKind(..)
          , Portray, Portrayal(..), PortrayalF(..)
          , cata, portray
-         , Base, FloatLiteral, shouldUseScientific
+         , Base(..), FloatLiteral(..)
          , formatIntLit, formatFloatLit, formatSpecialFloat
+         , normalizeFloatLit, trimFloatLit
          )
 import Data.Portray.Diff (Diff(..))
 
@@ -254,6 +258,16 @@ escapeSpecialOnly = const False
 -- are always escaped, and anything that wouldn't be escaped by 'Show' is never
 -- escaped.
 --
+-- * 'setTrimTrailingFloatZeros', whether to trim trailing zeros in
+-- floating-point literals.
+--
+-- * 'setScientificNotationThreshold', a limit on the number of padding
+-- (non-precision) zeros in floating-point literals before switching to
+-- scientific notation.
+--
+-- * 'setSeparatorGroupSizes', configuration of where to place underscores in
+-- the whole-number part of integral and fractional literals.
+--
 -- For forwards-compatibility reasons, the field selectors and constructor of
 -- this type are hidden; use the provided setters to build a config.  For
 -- example:
@@ -262,20 +276,111 @@ escapeSpecialOnly = const False
 -- config =
 --   defaultConfig
 --     & setShouldEscapeChar (const True) -- Escape everything we can.
+--     & setTrimTrailingFloatZeros True
 -- @
 data Config = Config
   { _shouldEscapeChar :: Char -> Bool
+  , _scientificNotationThreshold :: Int
+  , _trimTrailingFloatZeros :: Bool
+  , _separatorGroupSizes :: Base -> [Int]
   }
 
 -- | Set the predicate for whether to escape a given character; see 'Config'.
 setShouldEscapeChar :: (Char -> Bool) -> Config -> Config
-setShouldEscapeChar f _ = Config f
+setShouldEscapeChar f c = c { _shouldEscapeChar = f }
 
--- | A sensible default configuration to build on.
+-- | Configure trimming of trailing zeros from floating-point literals.
 --
--- Uses 'escapeNonASCII'.
+-- @since 0.2.1
+setTrimTrailingFloatZeros :: Bool -> Config -> Config
+setTrimTrailingFloatZeros b c = c { _trimTrailingFloatZeros = b }
+
+-- | Configure the number of zeros to pad with before using scientific notation.
+--
+-- If the radix point is within or adjaecent to the specified digits in a float
+-- literal, it's considered to need no padding zeros.  If the radix point is
+-- outside the specified digits, we can either materialize extra zeros to cover
+-- the gap between the specified digits and the radix point, or use scientific
+-- notation to move the radix point into the specified digits.  A single
+-- placeholder zero to the left of the radix point is not considered to be a
+-- padding zero.
+--
+--     FloatLiteral False "1234" (-4) = _.____1 234
+--                                    = 0.00001 234 -- 4 padding 0s
+--                                    =       1.234e-5
+--
+--     FloatLiteral False "1234" 8    = 1 234____._
+--                                    = 1 2340000   -- 4 padding 0s
+--                                    = 1.234e7
+--
+-- Trailing that are part of the specified digits are not considered to be
+-- padding (if not trimmed by 'setTrimTrailingFloatZeros'):
+--
+--     FloatLiteral False "100" 4     = 1 00_._
+--                                    = 1 000 -- 1 padding 0
+--                                    = 1.000e3
+--
+-- This threshold determines how many padding zeros to tolerate before
+-- switching over to scientific notation.  Choosing a very high threshold
+-- naturally means scientific notation will ~never be used.  Choosing a
+-- negative threshold naturally means scientific notation will always be used.
+--
+-- Deciding based on the number of padding zeros rather than the absolute
+-- magnitude of the number means we won't needlessly format @1234567@ as
+-- @1.234567e6@ when doing so doesn't actually make the representation more
+-- compact.
+--
+-- @since 0.2.1
+setScientificNotationThreshold :: Int -> Config -> Config
+setScientificNotationThreshold n c = c { _scientificNotationThreshold = n }
+
+-- | Set the separator spacing for NumericUnderscores, or disable underscores.
+--
+-- The list of group sizes is used working leftwards from the radix point.  If
+-- the list runs out, no further separators will be inserted.
+--
+--     [4, 3, 2, 2] : 123456000000 => 1_23_45_600_0000
+--     repeat 3     : 123456000000 => 123_456_000_000
+--     [1]          : 123456000000 => 12345600000_0
+--
+-- This allows both the conventional US separator placement of every three
+-- digits by providing @cycle 3@, as well as more complex spacings such as
+-- @3 : repeat 2@ reportedly used in India.
+--
+-- Backends should not cache these lists, and should attempt to use them in a
+-- single-use, streaming manner, so that large portions of infinite lists are
+-- not held in memory.  Clients should assume returning infinite lists is fine.
+--
+-- @since 0.2.1
+setSeparatorGroupSizes :: (Base -> [Int]) -> Config -> Config
+setSeparatorGroupSizes f c = c { _separatorGroupSizes = f }
+
+-- | A sensible, conservative default configuration to build on.
+--
+-- * Uses 'escapeNonASCII' to escape everything but printable ASCII characters.
+-- * Preserves any trailing zeros in float literals.
+-- * Uses scientific notation when any padding zeros would be needed.
+-- * Does not use numeric underscores.
 defaultConfig :: Config
-defaultConfig = Config escapeNonASCII
+defaultConfig = Config escapeNonASCII 0 False (const [])
+
+-- | A default "pretty" config with more opinionated choices.
+--
+-- This using numeric underscores, slightly less scientific notation, and less
+-- escaping compared to 'defaultConfig'.
+--
+-- @since 0.2.1
+prettyConfig :: Config
+prettyConfig =
+  defaultConfig
+    & setShouldEscapeChar escapeSpecialOnly
+    & setScientificNotationThreshold 2
+    & setSeparatorGroupSizes
+        (\case
+          Decimal -> repeat 3 -- Conventional US spacing: powers of 1,000.
+          Binary -> repeat 8  -- 8-bit groups.
+          Octal ->  []        -- *shrug* doesn't divide bytes evenly.
+          Hex -> repeat 8)    -- 32-bit groups.
 
 -- | Convert a 'Portrayal' to a 'Doc'.
 portrayalToDoc :: Config -> Portrayal -> Doc SyntaxClass
@@ -479,13 +584,25 @@ ppStrLit cfg unescaped =
 
   backslashBreak = P.annotate EscapeSequence $ "\\" <> P.line' <> "\\"
 
-ppIntLit :: Base -> Integer -> Doc SyntaxClass
-ppIntLit b x = P.annotate (Literal IntLit) $ text $ formatIntLit b x
+ppIntLit :: Base -> [Int] -> Integer -> Doc SyntaxClass
+ppIntLit b seps = P.annotate (Literal IntLit) . text . formatIntLit b seps
 
-ppFloatLit :: FloatLiteral -> Doc SyntaxClass
-ppFloatLit x =
-  -- TODO(awpr): configurable scientific notation?
-  P.annotate (Literal RatLit) $ text $ formatFloatLit (shouldUseScientific x) x
+paddingZeros :: FloatLiteral -> Int
+paddingZeros (FloatLiteral _ d e)
+  | e < 0 = negate e
+  | e > T.length d = e - T.length d
+  | otherwise = 0
+
+ppFloatLit :: Config -> FloatLiteral -> Doc SyntaxClass
+ppFloatLit cfg lit =
+  P.annotate (Literal RatLit) $ text $
+  formatFloatLit
+    (paddingZeros lit' > _scientificNotationThreshold cfg)
+    (_separatorGroupSizes cfg Decimal) lit'
+ where
+  lit' =
+    (if _trimTrailingFloatZeros cfg then trimFloatLit else id) $
+    normalizeFloatLit lit
 
 -- | Render one layer of 'PortrayalF' to 'DocAssocPrec'.
 toDocAssocPrecF
@@ -494,8 +611,8 @@ toDocAssocPrecF
   -> DocAssocPrec SyntaxClass
 toDocAssocPrecF cfg = \case
   NameF nm -> \_ _ -> ppPrefix nm
-  LitIntBaseF base x -> \_ _ -> ppIntLit base x
-  LitFloatF x -> \_ _ -> ppFloatLit x
+  LitIntBaseF base x -> \_ _ -> ppIntLit base (_separatorGroupSizes cfg base) x
+  LitFloatF x -> \_ _ -> ppFloatLit cfg x
 
   SpecialFloatF x -> \_ _ ->
     P.annotate Structural $ text $ -- Different color from numeric float lits.
@@ -585,9 +702,7 @@ basicShowPortrayal = styleShowPortrayal defaultConfig (const mempty)
 -- | Convenience function for rendering a 'Portrayal' to colorized 'Text'.
 prettyShowPortrayal :: Portrayal -> Text
 prettyShowPortrayal =
-  styleShowPortrayal
-    (defaultConfig & setShouldEscapeChar escapeSpecialOnly)
-    defaultStyling
+  styleShowPortrayal prettyConfig defaultStyling
 
 -- | Convenience function for rendering a 'Portrayal' to stylized 'Text'.
 styleShowPortrayal

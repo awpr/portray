@@ -57,9 +57,9 @@ module Data.Portray
            -- *** Integral Literals
          , Base(..), baseToInt, basePrefix, formatIntLit
            -- *** Floating-Point Literals
-         , FloatLiteral(..), floatToLiteral, floatLiteralToRational
+         , FloatLiteral(..), floatToLiteral, fixedToLiteral
+         , floatLiteralToRational, shouldUseScientific
          , normalizeFloatLit, trimFloatLit, formatFloatLit
-         , shouldUseScientific
          , SpecialFloatVal(..), formatSpecialFloat
            -- ** Operator Fixity
          , Assoc(..), Infixity(..), infix_, infixl_, infixr_
@@ -182,7 +182,7 @@ instance IsString Ident where
 -- The (supported) base used for an integral literal.
 --
 -- @since 0.3.0
-data Base = Binary | Octal | Decimal | Hexadecimal
+data Base = Binary | Octal | Decimal | Hex
   deriving (Eq, Ord, Read, Show, Generic)
   deriving Portray via Wrapped Generic Base
 
@@ -190,7 +190,7 @@ data Base = Binary | Octal | Decimal | Hexadecimal
 --
 -- @since 0.3.0
 baseToInt :: Base -> Int
-baseToInt = \case { Binary -> 2; Octal -> 8; Decimal -> 10; Hexadecimal -> 16 }
+baseToInt = \case { Binary -> 2; Octal -> 8; Decimal -> 10; Hex -> 16 }
 
 #if !MIN_VERSION_base(4, 16, 0)
 showBin :: (Show a, Integral a) => a -> ShowS
@@ -206,14 +206,27 @@ showIntInBase =
     Binary -> showBin
     Octal -> showOct
     Decimal -> showInt
-    Hexadecimal -> showHex
+    Hex -> showHex
+
+chunksR :: [Int] -> Text -> [Text]
+chunksR ns0 x0 = go ns0 x0 []
+ where
+  go _ "" tl = tl
+  go [] x tl = x:tl
+  go (n:ns) x tl =
+    let (rest, chunk) = T.splitAt (T.length x - n) x
+    in  go ns rest (chunk : tl)
+
+insertSeparators :: [Int] -> Text -> Text
+insertSeparators seps = T.intercalate "_" . chunksR seps
 
 -- | Format an integral literal in the given base.
 --
 -- @since 0.3.0
-formatIntLit :: (Show a, Integral a) => Base -> a -> Text
-formatIntLit b x =
-  sign <> basePrefix b <> T.pack (showIntInBase b (abs x) "")
+formatIntLit :: (Show a, Integral a) => Base -> [Int] -> a -> Text
+formatIntLit b seps x =
+  sign <> basePrefix b <>
+  insertSeparators seps (T.pack (showIntInBase b (abs x) ""))
  where
   sign
    | x < 0 = "-"
@@ -224,7 +237,7 @@ formatIntLit b x =
 -- @since 0.3.0
 basePrefix :: Base -> Text
 basePrefix =
-  \case { Binary -> "0b"; Octal -> "0o"; Decimal -> ""; Hexadecimal -> "0x" }
+  \case { Binary -> "0b"; Octal -> "0o"; Decimal -> ""; Hex -> "0x" }
 
 -- [Note: Rational literals]
 --
@@ -355,9 +368,9 @@ shouldUseScientific (FloatLiteral _ d e) = e < -1 || e > T.length d + 1
 -- | Format a 'FloatLiteral' to 'Text' in the conventional way.
 --
 -- @since 0.3.0
-formatFloatLit :: Bool -> FloatLiteral -> Text
-formatFloatLit scientific (FloatLiteral neg digits e) =
-  sign <> whole <> frac <> ex
+formatFloatLit :: Bool -> [Int] -> FloatLiteral -> Text
+formatFloatLit scientific seps (FloatLiteral neg digits e) =
+  sign <> insertSeparators seps whole <> frac <> ex
  where
   sign = if neg then "-" else ""
 
@@ -943,6 +956,9 @@ instance RealFloat a => Portray (PortrayFloatLit a) where
 deriving via PortrayFloatLit Float     instance Portray Float
 deriving via PortrayFloatLit Double    instance Portray Double
 
+-- | Convert a 'Fixed' to a 'FloatLiteral' representing its full precision.
+--
+-- @since 0.3.0
 fixedToLiteral :: forall a. HasResolution a => Fixed a -> FloatLiteral
 fixedToLiteral (MkFixed x) =
   FloatLiteral
