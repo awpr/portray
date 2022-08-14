@@ -16,7 +16,7 @@ category:       Data
 homepage:       https://github.com/google/hs-portray#readme
 bug-reports:    https://github.com/google/hs-portray/issues
 author:         Pavel Krajcevski <krajcevski@google.com>
-maintainer:     Andrew Pritchard <awpr@google.com>, Pavel Krajcevski <krajcevski@google.com>
+maintainer:     Andrew Pritchard <awpritchard@gmail.com>, Pavel Krajcevski <krajcevski@google.com>
 
 copyright:      2018-2021 Google LLC
 license:        Apache-2.0

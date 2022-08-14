@@ -26,7 +26,7 @@ license: Apache-2.0
 author: Pavel Krajcevski <krajcevski@google.com>
 copyright: 2018-2021 Google LLC
 maintainer: >
-  Andrew Pritchard <awpr@google.com>,
+  Andrew Pritchard <awpritchard@gmail.com>,
   Pavel Krajcevski <krajcevski@google.com>
 github: google/hs-portray/portray-diff-quickcheck
 

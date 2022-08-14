@@ -24,9 +24,9 @@ description:    This provides a single place to describe how a type should be fo
 category:       Text
 homepage:       https://github.com/google/hs-portray#readme
 bug-reports:    https://github.com/google/hs-portray/issues
-author:         Andrew Pritchard <awpr@google.com>
-maintainer:     Andrew Pritchard <awpr@google.com>
-copyright:      2020-2021 Google LLC
+author:         Andrew Pritchard <awpritchard@gmail.com>
+maintainer:     Andrew Pritchard <awpritchard@gmail.com>
+copyright:      2020-2021 Google LLC; 2022 Andrew Pritchard
 license:        Apache-2.0
 license-file:   LICENSE
 build-type:     Simple

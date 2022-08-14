@@ -13,9 +13,9 @@ description:    This uses @GHC.Generics@ to provide structural diffs between two
 category:       Data
 homepage:       https://github.com/google/hs-portray#readme
 bug-reports:    https://github.com/google/hs-portray/issues
-author:         Reiner Pope <reinerp@google.com>, Andrew Pritchard <awpr@google.com>
-maintainer:     Reiner Pope <reinerp@google.com>, Andrew Pritchard <awpr@google.com>
-copyright:      2018-2021 Google LLC
+author:         Reiner Pope <reinerp@google.com>, Andrew Pritchard <awpritchard@gmail.com>
+maintainer:     Reiner Pope <reinerp@google.com>, Andrew Pritchard <awpritchard@gmail.com>
+copyright:      2018-2021 Google LLC; 2022 Andrew Pritchard
 license:        Apache-2.0
 license-file:   LICENSE
 build-type:     Simple
