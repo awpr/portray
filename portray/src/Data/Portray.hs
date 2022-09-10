@@ -80,6 +80,11 @@ module Data.Portray
          ) where
 
 import Data.Bifunctor (second)
+import qualified Data.ByteString as BS hiding (unpack)
+import qualified Data.ByteString.Char8 as BS (unpack)
+import qualified Data.ByteString.Lazy as BL hiding (unpack)
+import qualified Data.ByteString.Lazy.Char8 as BL (unpack)
+import qualified Data.ByteString.Short as SBS
 import Data.Char (digitToInt, intToDigit, isAlpha, isDigit, isUpper)
 import Data.Coerce (Coercible, coerce)
 import Data.Fixed (Fixed(..), HasResolution(..))
@@ -993,6 +998,10 @@ instance Portray Char where
 
 instance Portray () where portray () = Tuple []
 instance Portray Text where portray = LitStr
+instance Portray BS.ByteString where portray = LitStr . T.pack . BS.unpack
+instance Portray BL.ByteString where portray = LitStr . T.pack . BL.unpack
+instance Portray SBS.ShortByteString where
+  portray = LitStr . T.pack . BS.unpack . SBS.fromShort
 
 instance Portray a => Portray (Ratio a) where
   portray x = Binop (Ident OpIdent "%") (infixl_ 7)
