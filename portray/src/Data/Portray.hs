@@ -68,7 +68,8 @@ module Data.Portray
            -- * Class
          , Portray(..)
            -- ** Via Generic
-         , GPortray(..), GPortrayProduct(..)
+         , genericPortray
+         , GPortray(..), gportray, GPortrayProduct(..)
            -- ** Via Show, Integral, Real, and RealFrac
          , PortrayIntLit(..), PortrayRatLit(..), PortrayFloatLit(..)
          , ShowAtom(..)
@@ -108,21 +109,20 @@ import Data.Type.Equality ((:~:)(..))
 import Data.Void (Void)
 import Data.Word (Word8, Word16, Word32, Word64)
 import qualified Data.Text as T
-import GHC.Exts (IsList, proxy#)
+import GHC.Exts (IsList)
 import qualified GHC.Exts as Exts
 import GHC.Float (floatToDigits)
 import GHC.Generics
          ( (:*:)(..), (:+:)(..)
          , Generic(..), Rep
          , U1(..), K1(..), M1(..), V1
-         , Meta(..), D1, C1, S1
-         , Constructor, conName, conFixity
+         , D1, C1, S1
+         , Constructor, conName, conFixity, conIsRecord
          , Selector, selName
          , Fixity(..), Associativity(..)
          )
 import GHC.Real (infinity, notANumber)
 import GHC.Stack (CallStack, SrcLoc, getCallStack, prettySrcLoc)
-import GHC.TypeLits (KnownSymbol, symbolVal')
 import Numeric
          ( showOct, showInt, showHex
 #if MIN_VERSION_base(4, 16, 0)
@@ -848,17 +848,21 @@ instance (GPortrayProduct f, GPortrayProduct g)
 -- Exported mostly to give Haddock something to link to; use
 -- @deriving Portray via Wrapped Generic MyType@.
 class GPortray f where
-  gportray :: f a -> Portrayal
+  -- | @since 0.3.0
+  gportrayRec
+    :: Bool
+       -- ^ Whether to use record syntax when applicable.
+    -> f a -> Portrayal
 
 instance GPortray f => GPortray (D1 d f) where
-  gportray (M1 x) = gportray x
+  gportrayRec rec (M1 x) = gportrayRec rec x
 
 instance GPortray V1 where
-  gportray x = case x of {}
+  gportrayRec _ x = case x of {}
 
 instance (GPortray f, GPortray g) => GPortray (f :+: g) where
-  gportray (L1 f) = gportray f
-  gportray (R1 g) = gportray g
+  gportrayRec rec (L1 f) = gportrayRec rec f
+  gportrayRec rec (R1 g) = gportrayRec rec g
 
 -- Detect operator constructor names (which must start with a colon) vs.
 -- alphanumeric constructor names.
@@ -894,30 +898,46 @@ toAssoc = \case
   RightAssociative -> AssocR
   NotAssociative -> AssocNope
 
-instance (KnownSymbol n, GPortrayProduct f)
-      => GPortray (C1 ('MetaCons n fx 'True) f) where
-  gportray (M1 x) = Record
-    (prefixCon $ symbolVal' @n proxy#)
-    (gportrayProduct x [])
+instance (Constructor c, GPortrayProduct f) => GPortray (C1 c f) where
+  gportrayRec rec (M1 x0)
 
-instance (Constructor ('MetaCons n fx 'False), GPortrayProduct f)
-      => GPortray (C1 ('MetaCons n fx 'False) f) where
-  gportray (M1 x0) =
-    case (nm, conFixity @('MetaCons n fx 'False) undefined, args) of
-      ('(' : ',' : _, _, _) -> Tuple args
-      (_, Infix lr p, [x, y]) -> Binop
-        (conIdent nm)
-        (Infixity (toAssoc lr) (toRational p))
-        x
-        y
-      (_, _, []) -> prefixCon nm
-      _ -> Apply (prefixCon nm) args
+    | rec && conIsRecord @c undefined =
+        Record
+          (prefixCon $ conName @c undefined)
+          (gportrayProduct x0 [])
+
+    | otherwise =
+        case (nm, conFixity @c undefined, args) of
+          ('(' : ',' : _, _, _) -> Tuple args
+          (_, Infix lr p, [x, y]) -> Binop
+            (conIdent nm)
+            (Infixity (toAssoc lr) (toRational p))
+            x
+            y
+          (_, _, []) -> prefixCon nm
+          _ -> Apply (prefixCon nm) args
    where
     args = _fpPortrayal <$> gportrayProduct x0 []
-    nm = conName @('MetaCons n fx 'False) undefined
+    nm = conName @c undefined
+
+-- | @'gportrayRec' True@, for backwards compatibility.
+gportray :: GPortray f => f a -> Portrayal
+gportray = gportrayRec True
+
+-- | An implementation of 'portray' derived from a type's 'Generic' instance.
+--
+-- This is also made available as an @instance Portray ('Wrapped' Generic a)@
+-- for use with @DerivingVia@, but this standalone-function form might be
+-- useful for e.g. deriving only some constructors' portrayals from 'Generic'
+-- while writing others' manually.
+--
+-- @since 0.3.0
+genericPortray
+  :: (Generic a, GPortray (Rep a)) => Bool -> a -> Portrayal
+genericPortray rec = gportrayRec rec . from
 
 instance (Generic a, GPortray (Rep a)) => Portray (Wrapped Generic a) where
-  portray (Wrapped x) = gportray (from x)
+  portray (Wrapped x) = genericPortray True x
 
 -- | A newtype wrapper providing a 'Portray' instance via 'Integral'.
 newtype PortrayIntLit a = PortrayIntLit a
