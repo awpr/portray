@@ -69,6 +69,7 @@ module Data.Portray
          , Portray(..)
            -- ** Via Generic
          , genericPortray
+         , PortrayDataCons(..)
          , GPortray(..), gportray, GPortrayProduct(..)
            -- ** Via Show, Integral, Real, and RealFrac
          , PortrayIntLit(..), PortrayRatLit(..), PortrayFloatLit(..)
@@ -938,6 +939,12 @@ genericPortray rec = gportrayRec rec . from
 
 instance (Generic a, GPortray (Rep a)) => Portray (Wrapped Generic a) where
   portray (Wrapped x) = genericPortray True x
+
+-- | A newtype wrapper providing a generic 'Portray' instance sans records.
+newtype PortrayDataCons a = PortrayDataCons a
+
+instance (Generic a, GPortray (Rep a)) => Portray (PortrayDataCons a) where
+  portray (PortrayDataCons x) = genericPortray False x
 
 -- | A newtype wrapper providing a 'Portray' instance via 'Integral'.
 newtype PortrayIntLit a = PortrayIntLit a
