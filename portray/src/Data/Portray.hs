@@ -398,7 +398,7 @@ formatFloatLit scientific seps (FloatLiteral neg digits e) =
 -- | Special floating-point values including NaNs and infinities.
 --
 -- @since 0.3.0
-data SpecialFloatVal = NaN | Infinity { infNegate :: Bool }
+data SpecialFloatVal = NaN | Infinity { infNegate :: !Bool }
   deriving (Eq, Ord, Read, Show, Generic)
   deriving Portray via Wrapped Generic SpecialFloatVal
 
@@ -435,9 +435,9 @@ data PortrayalF a
     -- ^ A character literal.  e.g. @\'a\'@
   | OpaqueF !Text
     -- ^ A chunk of opaque text.  e.g. @abc"]def@
-  | ApplyF !a [a]
+  | ApplyF a [a]
     -- ^ A function application to several arguments.
-  | BinopF !Ident !Infixity !a !a
+  | BinopF !Ident !Infixity a a
     -- ^ A binary infix operator application to two arguments.
   | TupleF [a]
     -- ^ A tuple of sub-values.
@@ -445,17 +445,17 @@ data PortrayalF a
     -- ^ A list of sub-values.
   | LambdaCaseF [(a, a)]
     -- ^ A lambda-case expression.
-  | RecordF !a [FactorPortrayal a]
+  | RecordF a [FactorPortrayal a]
     -- ^ A record construction/update syntax.
-  | TyAppF !a !a
+  | TyAppF a a
     -- ^ A TypeApplication.
-  | TySigF !a !a
+  | TySigF a a
     -- ^ A term with explicit type signature.
-  | QuotF !Text !a
+  | QuotF !Text a
     -- ^ A quasiquoter term with the given name.
   | UnlinesF [a]
     -- ^ A collection of vertically-aligned lines
-  | NestF !Int !a
+  | NestF !Int a
     -- ^ A subdocument indented by the given number of columns.
   deriving (Eq, Ord, Read, Show, Functor, Foldable, Traversable, Generic)
   deriving Portray via Wrapped Generic (PortrayalF a)
@@ -504,7 +504,7 @@ pattern LitRatF x <- (matchLitRat -> Just x)
 -- | A 'Portrayal' along with a field name; one piece of a record literal.
 data FactorPortrayal a = FactorPortrayal
   { _fpFieldName :: !Ident
-  , _fpPortrayal :: !a
+  , _fpPortrayal :: a
   }
   deriving (Eq, Ord, Read, Show, Functor, Foldable, Traversable, Generic)
   deriving Portray via Wrapped Generic (FactorPortrayal a)
