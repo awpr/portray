@@ -111,7 +111,9 @@ module Data.Portray.Prettyprinter
          , DocAssocPrec, toDocAssocPrecF, toDocAssocPrec
            -- ** Convenience Functions
          , portrayalToDoc
-         , styleShowPortrayal, prettyShowPortrayal, basicShowPortrayal
+         , styleShowPortrayal, styleShowPortrayalLazy
+         , prettyShowPortrayal, prettyShowPortrayalLazy
+         , basicShowPortrayal
          ) where
 
 import Data.Char (isAscii, isDigit, isPrint)
@@ -119,7 +121,8 @@ import Data.Function ((&))
 import Data.Functor ((<&>))
 import Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.IO as T (putStrLn)
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.IO as T (putStrLn)
 import GHC.Show (showLitChar)
 
 #if MIN_VERSION_prettyprinter(1, 7, 0)
@@ -148,7 +151,7 @@ import Data.Portray.Diff (Diff(..))
 -- This uses ANSI color codes, so take care not to use it in contexts where it
 -- might output to something other than a terminal.
 pp :: Portray a => a -> IO ()
-pp = T.putStrLn . prettyShowPortrayal . portray
+pp = T.putStrLn . prettyShowPortrayalLazy . portray
 
 -- | Pretty-print a value using its 'Portray' instance.
 --
@@ -161,7 +164,7 @@ showPortrayal = basicShowPortrayal . portray
 -- This uses ANSI color codes, so take care not to use it in contexts where it
 -- might output to something other than a terminal.
 ppd :: Diff a => a -> a -> IO ()
-ppd x = T.putStrLn . maybe "_" prettyShowPortrayal . diff x
+ppd x = T.putStrLn . maybe "_" prettyShowPortrayalLazy . diff x
 
 -- | Pretty-print a diff between two values using a 'Diff' instance.
 --
@@ -702,11 +705,25 @@ prettyShowPortrayal :: Portrayal -> Text
 prettyShowPortrayal =
   styleShowPortrayal prettyConfig defaultStyling
 
+-- | A lazy 'TL.Text' variant of 'prettyShowPortrayal'.
+--
+-- @since 0.2.1
+prettyShowPortrayalLazy :: Portrayal -> TL.Text
+prettyShowPortrayalLazy =
+  styleShowPortrayalLazy prettyConfig defaultStyling
+
 -- | Convenience function for rendering a 'Portrayal' to stylized 'Text'.
 styleShowPortrayal
   :: Config -> (SyntaxClass -> Maybe A.AnsiStyle) -> Portrayal -> Text
-styleShowPortrayal cfg style p =
-  A.renderStrict $ P.alterAnnotationsS style $
+styleShowPortrayal cfg style = TL.toStrict . styleShowPortrayalLazy cfg style
+
+-- | A lazy 'TL.Text' variant of 'styleShowPortrayal'.
+--
+-- @since 0.2.1
+styleShowPortrayalLazy
+  :: Config -> (SyntaxClass -> Maybe A.AnsiStyle) -> Portrayal -> TL.Text
+styleShowPortrayalLazy cfg style p =
+  A.renderLazy $ P.alterAnnotationsS style $
   P.layoutPretty P.defaultLayoutOptions $
   toDocAssocPrec cfg p AssocNope (-1)
 

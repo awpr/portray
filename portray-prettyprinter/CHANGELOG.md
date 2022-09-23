@@ -4,6 +4,7 @@
 * Fix an alignment bug in list/tuple elements.
 * Support flexible configuration of floating-point literals.
 * Support configuration of numeric place separators.
+* Use lazy Text internally in `pp` and `ppd` to support large/infinite values.
 
 # 0.2.0
 
