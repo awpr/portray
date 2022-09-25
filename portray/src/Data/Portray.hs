@@ -191,7 +191,7 @@ instance IsString Ident where
         | otherwise -> OpIdent
       "" -> VarIdent -- /shrug/
 
--- The (supported) base used for an integral literal.
+-- | The base (from a list of supported bases) used for an integral literal.
 --
 -- @since 0.3.0
 data Base = Binary | Octal | Decimal | Hex
