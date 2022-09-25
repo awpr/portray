@@ -490,7 +490,7 @@ buildLitRat x
 -- | Backwards compat: rational values including NaNs and infinities.
 --
 -- When matching, this ignores the format; when constructing, it chooses
--- according to the same criteria as 'showGFloat'.
+-- according to the same criteria as 'Numeric.showGFloat'.
 pattern LitRatF :: Rational -> PortrayalF a
 pattern LitRatF x <- (matchLitRat -> Just x)
  where LitRatF x = buildLitRat x
@@ -869,11 +869,11 @@ data GPortrayConfig = GPortrayConfig
 defaultGPortrayConfig :: GPortrayConfig
 defaultGPortrayConfig = GPortrayConfig True
 
--- | A `lens`-compatible zero-dependency lens.
+-- | A "lens"-compatible zero-dependency lens.
 --
 -- This is only exported to appease Haddock, and the name doesn't have any
 -- particular meaning other than a best-effort attempt to avoid creating name
--- clashes when the module is imported unqualified; this is just 'Lens''.
+-- clashes when the module is imported unqualified; this is just @Lens'@.
 --
 -- @since 0.3.0
 type AnLens s a = forall f. Functor f => (a -> f a) -> s -> f s
