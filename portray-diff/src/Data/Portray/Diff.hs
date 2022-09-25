@@ -54,7 +54,14 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Data.Portray.Diff (Diff(..), diffAtom, DiffAtom(..), diffVs) where
+module Data.Portray.Diff
+         ( -- * Structural Diffs
+           Diff(..), diffAtom
+           -- * Atomic Diff
+         , DiffAtom(..), diffVs
+           -- * Generic
+         , GDiff(..), GDiffRecord(..), GDiffCtor(..)
+         ) where
 
 import Prelude hiding (zipWith)
 
@@ -88,6 +95,7 @@ import Data.Portray
 import qualified Data.DList as D
 import Data.Wrapped (Wrapped(..), Wrapped1(..))
 
+-- | Structural comparison between values giving a description of differences.
 class Diff a where
   -- | Returns 'Nothing' when equal; or a 'Portrayal' showing the differences.
   diff :: a -> a -> Maybe Portrayal
@@ -97,6 +105,7 @@ class Diff a where
 instance (Generic a, GDiff a (Rep a)) => Diff (Wrapped Generic a) where
   diff (Wrapped x) (Wrapped y) = gdiff x y (from x) (from y)
 
+-- | Produce a 'Portrayal' describing a single atomic difference.
 vs, diffVs :: Portrayal -> Portrayal -> Portrayal
 vs a b = Binop (Ident OpIdent "/=") (Infixity AssocNope 4) a b
 diffVs = vs
@@ -108,7 +117,7 @@ diffAtom a b
   | a == b = Nothing
   | otherwise = Just (portray a `vs` portray b)
 
--- Diff record fields, creating docs only for fields that differ.
+-- | Diff record fields, creating docs only for fields that differ.
 class GDiffRecord f where
   gdiffRecord :: f x -> f x -> D.DList (FactorPortrayal Portrayal)
 
@@ -125,8 +134,8 @@ instance (Selector s, Diff a) => GDiffRecord (S1 s (K1 i a)) where
 instance (GDiffRecord f, GDiffRecord g) => GDiffRecord (f :*: g) where
   gdiffRecord (fa :*: ga) (fb :*: gb) = gdiffRecord fa fb <> gdiffRecord ga gb
 
--- Diff constructor fields, filling equal fields with "_" and reporting whether
--- any diffs were detected.
+-- | Diff constructor fields, filling equal fields with "_" and reporting
+-- whether any diffs were detected.
 --
 -- N.B. this works fine on record constructors, too, in case we want to support
 -- configuring whether to use record syntax or constructor application syntax.
@@ -149,6 +158,10 @@ instance Diff a => GDiffCtor (S1 s (K1 i a)) where
 instance (GDiffCtor f, GDiffCtor g) => GDiffCtor (f :*: g) where
   gdiffCtor (fa :*: ga) (fb :*: gb) = gdiffCtor fa fb <> gdiffCtor ga gb
 
+-- | Generic implementation of 'Diff'.
+--
+-- This is primarily exported to appease Haddock; use @via Wrapped Generic T@
+-- to access this functionality.
 class GDiff a f where
   gdiff :: a -> a -> f x -> f x -> Maybe Portrayal
 
@@ -212,6 +225,7 @@ instance Diff Double where diff = diffAtom
 instance Diff Text where diff = diffAtom
 instance (Eq a, Portray a) => Diff (Ratio a) where diff = diffAtom
 
+-- | A @DerivingVia@ wrapper for providing 'Diff' by 'Eq' and 'Portray'.
 newtype DiffAtom a = DiffAtom a
   deriving newtype (Eq, Portray)
 
