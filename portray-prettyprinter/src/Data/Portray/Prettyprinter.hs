@@ -308,20 +308,26 @@ setTrimTrailingFloatZeros b c = c { _trimTrailingFloatZeros = b }
 -- placeholder zero to the left of the radix point is not considered to be a
 -- padding zero.
 --
+-- @
 --     FloatLiteral False "1234" (-4) = _.____1 234
 --                                    = 0.00001 234 -- 4 padding 0s
 --                                    =       1.234e-5
+-- @
 --
+-- @
 --     FloatLiteral False "1234" 8    = 1 234____._
 --                                    = 1 2340000   -- 4 padding 0s
 --                                    = 1.234e7
+-- @
 --
 -- Trailing that are part of the specified digits are not considered to be
 -- padding (if not trimmed by 'setTrimTrailingFloatZeros'):
 --
+-- @
 --     FloatLiteral False "100" 4     = 1 00_._
 --                                    = 1 000 -- 1 padding 0
 --                                    = 1.000e3
+-- @
 --
 -- This threshold determines how many padding zeros to tolerate before
 -- switching over to scientific notation.  Choosing a very high threshold
@@ -342,9 +348,11 @@ setScientificNotationThreshold n c = c { _scientificNotationThreshold = n }
 -- The list of group sizes is used working leftwards from the radix point.  If
 -- the list runs out, no further separators will be inserted.
 --
+-- @
 --     [4, 3, 2, 2] : 123456000000 => 1_23_45_600_0000
 --     repeat 3     : 123456000000 => 123_456_000_000
 --     [1]          : 123456000000 => 12345600000_0
+-- @
 --
 -- This allows both the conventional US separator placement of every three
 -- digits by providing @cycle 3@, as well as more complex spacings such as
