@@ -4,6 +4,8 @@
 * Change floating-point literals to be pre-converted to digits.
 * Add a representation of infinite and NaN values.
 * Add several utility functions for formatting int and float literals.
+* Add configuration of the Generic functionality to suppress record syntax.
+* Don't use strict fields for the spine of the `Portrayal` tree structure.
 
 # 0.2.0
 
