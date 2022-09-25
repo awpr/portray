@@ -1,4 +1,5 @@
 -- Copyright 2021 Google LLC
+-- Copyright 2022 Andrew Pritchard
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -63,7 +64,7 @@ main = defaultMain
             "5 :| []"
 
       , testCase "con" $
-          prettyShowPortrayal 
+          prettyShowPortrayal
               (Binop
                 (Ident ConIdent "InfixCon")
                 (infixl_ 9)
