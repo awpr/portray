@@ -14,7 +14,7 @@
 # limitations under the License.
 
 name: portray-diff
-version: 0.1.0.2
+version: 0.1.1
 category: Data
 synopsis: Pretty structural diffs between two values
 description: |

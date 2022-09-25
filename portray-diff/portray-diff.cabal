@@ -5,7 +5,7 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           portray-diff
-version:        0.1.0.2
+version:        0.1.1
 synopsis:       Pretty structural diffs between two values
 description:    This uses @GHC.Generics@ to provide structural diffs between two values in
                 pretty-printed form.  This is primarily useful for test assertions and manual
