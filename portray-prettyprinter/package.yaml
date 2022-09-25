@@ -23,16 +23,14 @@ description: |
   <https://hackage.haskell.org/package/portray portray> along with derivable
   'Pretty' instances for types with 'Portray' instances.
 
-  This started out as a fork of
-  <https://hackage.haskell.org/package/portray-pretty portray-pretty>, and is
-  still very similar.  However, @prettyprinter@ gives more flexibility to
-  documents at the cost of requiring more behavior to be specified explicitly.
-  As such, some formats are nicer with the @prettyprinter@ backend,
-  configurable syntax highlighting is supported, and unicode escaping is
-  configurable.  However, this backend is less mature and hasn't been used as
-  much in practice, so there are likely more formatting bugs than in
-  @portray-pretty@.  Please do file bugs on the GitHub issue tracker if you
-  find anything that seems obviously wrong!
+  This backend has largely superseded the original
+  <https://hackage.haskell.org/package/portray-pretty portray-pretty>.  Because
+  @prettyprinter@ gives more flexibility to documents at the cost of requiring
+  more behavior to be specified explicitly, some formats are nicer with this
+  backend, configurable syntax highlighting is supported, and unicode escaping
+  is configurable.  However, as this backend is still newer, there are
+  potentially more unnoticed formatting bugs.  Please do file bugs on the
+  GitHub issue tracker if you find anything that seems obviously wrong!
 
   Try using 'pp' as the print function in GHCi:
   @:set -interactive-print=Data.Portray.Prettyprinter.pp@!
