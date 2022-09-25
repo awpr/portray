@@ -47,7 +47,7 @@ library
       base >=4.12 && <4.17
     , bytestring >=0.9 && <0.12
     , containers ==0.6.*
-    , text >=0.1 && <1.3
+    , text >=0.1 && <2.1
     , wrapped ==0.1.*
   default-language: Haskell2010
 
@@ -64,6 +64,6 @@ test-suite Portray-test
     , portray
     , test-framework
     , test-framework-hunit
-    , text >=0.1 && <1.3
+    , text >=0.1 && <2.1
     , wrapped ==0.1.*
   default-language: Haskell2010
