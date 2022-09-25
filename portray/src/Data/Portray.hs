@@ -32,6 +32,8 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE QuantifiedConstraints #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
@@ -68,9 +70,12 @@ module Data.Portray
            -- * Class
          , Portray(..)
            -- ** Via Generic
-         , genericPortray
          , PortrayDataCons(..)
+         , genericPortray
          , GPortray(..), gportray, GPortrayProduct(..)
+           -- *** Configuration
+         , GPortrayConfig, defaultGPortrayConfig
+         , useRecordSyntax, suppressRecordSyntax
            -- ** Via Show, Integral, Real, and RealFrac
          , PortrayIntLit(..), PortrayRatLit(..), PortrayFloatLit(..)
          , ShowAtom(..)
@@ -844,26 +849,60 @@ instance (GPortrayProduct f, GPortrayProduct g)
       => GPortrayProduct (f :*: g) where
   gportrayProduct (f :*: g) = gportrayProduct f . gportrayProduct g
 
+-- | Configuration for 'genericPortray' / 'gportray'.
+--
+-- To facilitate backwards compatibility, the constructor and fields are
+-- unexported; instead, start from 'defaultGPortrayConfig' and adjust using the
+-- provided lens(es) or setter(s).
+--
+-- @since 0.3.0
+data GPortrayConfig = GPortrayConfig
+  { _cfgUseRecordSyntax :: Bool
+  }
+
+-- | Default 'GPortrayConfig'.
+--
+-- * Uses record syntax when the constructor was defined with record syntax.
+--
+-- @since 0.3.0
+defaultGPortrayConfig :: GPortrayConfig
+defaultGPortrayConfig = GPortrayConfig True
+
+-- `lens`-compatible zero-dependency lens.
+type Lens s a = forall f. Functor f => (a -> f a) -> s -> f s
+
+-- | Enable or disable record syntax for record constructors.
+--
+-- @since 0.3.0
+useRecordSyntax :: Lens GPortrayConfig Bool
+useRecordSyntax f (GPortrayConfig rec) = GPortrayConfig <$> f rec
+
+-- | Disable record syntax for record constructors.
+--
+-- This is primarily provided as a convenience for users with no dependency on
+-- a lens library, since it'd otherwise be clumsy to use the lens.
+--
+-- @since 0.3.0
+suppressRecordSyntax :: GPortrayConfig -> GPortrayConfig
+suppressRecordSyntax _ = GPortrayConfig False
+
 -- | Generics-based deriving of 'Portray'.
 --
 -- Exported mostly to give Haddock something to link to; use
 -- @deriving Portray via Wrapped Generic MyType@.
 class GPortray f where
   -- | @since 0.3.0
-  gportrayRec
-    :: Bool
-       -- ^ Whether to use record syntax when applicable.
-    -> f a -> Portrayal
+  gportrayCfg :: GPortrayConfig -> f a -> Portrayal
 
 instance GPortray f => GPortray (D1 d f) where
-  gportrayRec rec (M1 x) = gportrayRec rec x
+  gportrayCfg rec (M1 x) = gportrayCfg rec x
 
 instance GPortray V1 where
-  gportrayRec _ x = case x of {}
+  gportrayCfg _ x = case x of {}
 
 instance (GPortray f, GPortray g) => GPortray (f :+: g) where
-  gportrayRec rec (L1 f) = gportrayRec rec f
-  gportrayRec rec (R1 g) = gportrayRec rec g
+  gportrayCfg rec (L1 f) = gportrayCfg rec f
+  gportrayCfg rec (R1 g) = gportrayCfg rec g
 
 -- Detect operator constructor names (which must start with a colon) vs.
 -- alphanumeric constructor names.
@@ -900,9 +939,9 @@ toAssoc = \case
   NotAssociative -> AssocNope
 
 instance (Constructor c, GPortrayProduct f) => GPortray (C1 c f) where
-  gportrayRec rec (M1 x0)
+  gportrayCfg GPortrayConfig{..} (M1 x0)
 
-    | rec && conIsRecord @c undefined =
+    | _cfgUseRecordSyntax && conIsRecord @c undefined =
         Record
           (prefixCon $ conName @c undefined)
           (gportrayProduct x0 [])
@@ -921,9 +960,9 @@ instance (Constructor c, GPortrayProduct f) => GPortray (C1 c f) where
     args = _fpPortrayal <$> gportrayProduct x0 []
     nm = conName @c undefined
 
--- | @'gportrayRec' True@, for backwards compatibility.
+-- | @'gportrayCfg' True@, for backwards compatibility.
 gportray :: GPortray f => f a -> Portrayal
-gportray = gportrayRec True
+gportray = gportrayCfg defaultGPortrayConfig
 
 -- | An implementation of 'portray' derived from a type's 'Generic' instance.
 --
@@ -934,17 +973,17 @@ gportray = gportrayRec True
 --
 -- @since 0.3.0
 genericPortray
-  :: (Generic a, GPortray (Rep a)) => Bool -> a -> Portrayal
-genericPortray rec = gportrayRec rec . from
+  :: (Generic a, GPortray (Rep a)) => GPortrayConfig -> a -> Portrayal
+genericPortray cfg = gportrayCfg cfg . from
 
 instance (Generic a, GPortray (Rep a)) => Portray (Wrapped Generic a) where
-  portray (Wrapped x) = genericPortray True x
+  portray (Wrapped x) = genericPortray defaultGPortrayConfig x
 
 -- | A newtype wrapper providing a generic 'Portray' instance sans records.
 newtype PortrayDataCons a = PortrayDataCons a
 
 instance (Generic a, GPortray (Rep a)) => Portray (PortrayDataCons a) where
-  portray (PortrayDataCons x) = genericPortray False x
+  portray (PortrayDataCons x) = genericPortray (GPortrayConfig False) x
 
 -- | A newtype wrapper providing a 'Portray' instance via 'Integral'.
 newtype PortrayIntLit a = PortrayIntLit a
