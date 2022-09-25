@@ -23,10 +23,10 @@ packages:
 - portray-prettyprinter
 
 extra-deps:
-- attenuation-0.1.0.0
-- wrapped-0.1.0.0
-- fin-int-0.1.0.0
-- sint-0.1.0.0
+- attenuation-0.2.0
+- wrapped-0.1.0.1
+- fin-int-0.2.0
+- sint-0.2.0
 
 ghc-options:
   "$locals": -Wall -Werror
