@@ -448,9 +448,9 @@ ppBulletList o s c = \case
   []         -> opener <> closer
   (doc:docs) ->
     P.group $
-      foldl
-        (\acc x -> acc <> P.group (P.line' <> x))
-        (opener <> P.flatAlt " " "" <> P.align doc)
+      opener <> P.flatAlt " " "" <> P.align doc <>
+      foldMap
+        (\x -> P.group (P.line' <> x))
         (map (\x -> separator P.<+> P.align x) docs) <>
       P.line' <> closer
  where
