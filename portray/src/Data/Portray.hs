@@ -76,6 +76,7 @@ module Data.Portray
            -- *** Configuration
          , GPortrayConfig, defaultGPortrayConfig
          , useRecordSyntax, suppressRecordSyntax
+         , AnLens
            -- ** Via Show, Integral, Real, and RealFrac
          , PortrayIntLit(..), PortrayRatLit(..), PortrayFloatLit(..)
          , ShowAtom(..)
@@ -868,13 +869,19 @@ data GPortrayConfig = GPortrayConfig
 defaultGPortrayConfig :: GPortrayConfig
 defaultGPortrayConfig = GPortrayConfig True
 
--- `lens`-compatible zero-dependency lens.
-type Lens s a = forall f. Functor f => (a -> f a) -> s -> f s
+-- | A `lens`-compatible zero-dependency lens.
+--
+-- This is only exported to appease Haddock, and the name doesn't have any
+-- particular meaning other than a best-effort attempt to avoid creating name
+-- clashes when the module is imported unqualified; this is just 'Lens''.
+--
+-- @since 0.3.0
+type AnLens s a = forall f. Functor f => (a -> f a) -> s -> f s
 
 -- | Enable or disable record syntax for record constructors.
 --
 -- @since 0.3.0
-useRecordSyntax :: Lens GPortrayConfig Bool
+useRecordSyntax :: AnLens GPortrayConfig Bool
 useRecordSyntax f (GPortrayConfig rec) = GPortrayConfig <$> f rec
 
 -- | Disable record syntax for record constructors.
