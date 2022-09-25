@@ -18,9 +18,9 @@ description:    This provides a single place to describe how a type should be fo
                 formatting choices.  If there are any egregious omissions, we can always add
                 more constructors.
                 .
-                This library is explicitly not intended to provide a way to express /all
-                documents/; only a particular flavor of pseudo-Haskell syntax representing
-                values and types.
+                This library is explicitly not intended to provide a way to express
+                /all documents/; only a particular flavor of pseudo-Haskell syntax
+                representing values and types.
 category:       Text
 homepage:       https://github.com/awpr/portray#readme
 bug-reports:    https://github.com/awpr/portray/issues

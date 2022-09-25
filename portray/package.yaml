@@ -29,9 +29,9 @@ description: |
   formatting choices.  If there are any egregious omissions, we can always add
   more constructors.
 
-  This library is explicitly not intended to provide a way to express /all
-  documents/; only a particular flavor of pseudo-Haskell syntax representing
-  values and types.
+  This library is explicitly not intended to provide a way to express
+  /all documents/; only a particular flavor of pseudo-Haskell syntax
+  representing values and types.
 license: Apache-2.0
 author: Andrew Pritchard <awpritchard@gmail.com>
 copyright: 2020-2021 Google LLC; 2022 Andrew Pritchard
