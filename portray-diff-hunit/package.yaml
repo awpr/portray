@@ -19,7 +19,7 @@ synopsis: HUnit assertions based on portray-diff
 description: |
     This provides equality assertion functions for HUnit that pretty-print
     structural diffs of the values in question, rather than dumping the entire
-    alues as part of the counterexamples.  This is useful when comparing very
+    values as part of the counterexamples.  This is useful when comparing very
     large values, since it can otherwise be difficult to tell what changed
     between expected and actual values.
 license: Apache-2.0
