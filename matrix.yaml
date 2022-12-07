@@ -13,6 +13,12 @@
 # limitations under the License.
 
 build:
+  - resolver: lts-20.3
+    compiler: ghc-9.2.5
+
+  - resolver: lts-19.33
+    compiler: ghc-9.0.2
+
   - resolver: lts-19.25
     compiler: ghc-8.10.7
 
@@ -23,4 +29,4 @@ build:
     compiler: ghc-8.8.4
 
   - resolver: nightly
-    compiler: ghc-9.2.4
+    compiler: ghc-9.4.3
