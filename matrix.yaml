@@ -1,4 +1,5 @@
 # Copyright 2021 Google LLC
+# Copyright 2022-2023 Andrew Pritchard
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,8 +14,8 @@
 # limitations under the License.
 
 build:
-  - resolver: lts-20.3
-    compiler: ghc-9.2.5
+  - resolver: lts-20.13
+    compiler: ghc-9.2.7
 
   - resolver: lts-19.33
     compiler: ghc-9.0.2
@@ -29,4 +30,7 @@ build:
     compiler: ghc-8.8.4
 
   - resolver: nightly
-    compiler: ghc-9.4.3
+    compiler: ghc-9.4.4
+
+  - resolver: nightly
+    compiler: ghc-9.6.1
